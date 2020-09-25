@@ -43,7 +43,6 @@ class Desktop : public QObject, CommonInterface
     Q_PLUGIN_METADATA(IID "org.kycc.CommonInterface")
     Q_INTERFACES(CommonInterface)
 
-
 public:
     Desktop();
     ~Desktop();
@@ -52,8 +51,9 @@ public:
     int get_plugin_type() Q_DECL_OVERRIDE;
     QWidget * get_plugin_ui() Q_DECL_OVERRIDE;
     void plugin_delay_control() Q_DECL_OVERRIDE;
+    const QString name() const  Q_DECL_OVERRIDE;
 
-public:
+    void initSearchText();
     void initTranslation();
     void setupComponent();
     void setupConnect();
@@ -61,10 +61,20 @@ public:
     void initLockingStatus();
     void initTrayStatus(QString name, QIcon icon, QGSettings *gsettings);
     void initTraySettings();
-
-
+    void clearContent();
 
 private:
+    Ui::Desktop *ui;
+
+    int pluginType;
+    QString pluginName;
+    QWidget * pluginWidget;
+    QVector<QGSettings*> *vecGsettings;
+    QMap<QString, QString> transMap; // transaltion Map
+    QMap<QString, QString> iconMap;
+    QStringList disList;
+    QStringList nameList;
+
     SwitchButton * deskComputerSwitchBtn;
     SwitchButton * deskTrashSwitchBtn;
     SwitchButton * deskHomeSwitchBtn;
@@ -79,17 +89,9 @@ private:
 
     QGSettings * dSettings;
 
-private:
-    Ui::Desktop *ui;
-
-    int pluginType;
-    QString pluginName;
-    QWidget * pluginWidget;
-    QVector<QGSettings*> *vecGsettings;
-    QMap<QString, QString> transMap; // transaltion Map
-    QMap<QString, QString> iconMap;
-    QStringList disList;
-
+private slots:
+    void removeTrayItem(QString itemName);
+    void addTrayItem(QGSettings * trayGSetting);
 };
 
 #endif // DESKTOP_H
