@@ -80,22 +80,6 @@ Shortcut::Shortcut()
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
     ui->title2Label->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
 
-//    pluginWidget->setStyleSheet("background: #ffffff;");
-
-//    ui->generalListWidget->setStyleSheet("QListWidget#generalListWidget{background: #ffffff; border: none;}");
-
-//    ui->showBtn->setStyleSheet("QPushButton{background: #E9E9E9; border-radius: 4px;}"
-//                               "QPushButton:hover:!pressed{background: #3d6be5; border-radius: 4px;}"
-//                               "QPushButton:hover:pressed{background: #415FC4; border-radius: 4px;}");
-
-//    ui->resetBtn->setStyleSheet("QPushButton{background: #E9E9E9; border-radius: 4px;}"
-//                               "QPushButton:hover:!pressed{background: #3d6be5; border-radius: 4px;}"
-//                               "QPushButton:hover:pressed{background: #415FC4; border-radius: 4px;}");
-
-//    ui->customListWidget->setStyleSheet("QListWidget#customListWidget{background: #ffffff; border: none;}");
-
-//    ui->addWidget->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-
     pKeyMap = new KeyMap;
     addDialog = new addShortcutDialog();
     showDialog = new ShowAllShortcut();
@@ -105,6 +89,7 @@ Shortcut::Shortcut()
     setupComponent();
     setupConnect();
     initFunctionStatus();
+    connectToServer();
 }
 
 Shortcut::~Shortcut()
@@ -131,19 +116,47 @@ void Shortcut::plugin_delay_control(){
 
 }
 
+const QString Shortcut::name() const {
+
+    return QStringLiteral("shortcut");
+}
+
+void Shortcut::connectToServer(){
+    cloudInterface = new QDBusInterface("org.kylinssoclient.dbus",
+                                          "/org/kylinssoclient/path",
+                                          "org.freedesktop.kylinssoclient.interface",
+                                          QDBusConnection::sessionBus());
+    if (!cloudInterface->isValid())
+    {
+        qDebug() << "fail to connect to service";
+        qDebug() << qPrintable(QDBusConnection::systemBus().lastError().message());
+        return;
+    }
+//    QDBusConnection::sessionBus().connect(cloudInterface, SIGNAL(shortcutChanged()), this, SLOT(shortcutChangedSlot()));
+    QDBusConnection::sessionBus().connect(QString(), QString("/org/kylinssoclient/path"), QString("org.freedesktop.kylinssoclient.interface"), "shortcutChanged", this, SLOT(shortcutChangedSlot()));
+    // 将以后所有DBus调用的超时设置为 milliseconds
+    cloudInterface->setTimeout(2147483647); // -1 为默认的25s超时
+}
+
 void Shortcut::setupComponent(){
 //    ui->addLabel->setPixmap(QPixmap("://img/plugins/printer/add.png"));
 
+    //~ contents_path /shortcut/System Shortcut
+    ui->titleLabel->setText(tr("System Shortcut"));
+    //~ contents_path /shortcut/Custom Shortcut
+    ui->title2Label->setText(tr("Custom Shortcut"));
+
+
     ui->generalListWidget->setFocusPolicy(Qt::NoFocus);
     ui->generalListWidget->setSelectionMode(QAbstractItemView::NoSelection);
-    ui->generalListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+//    ui->generalListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->generalListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->generalListWidget->setSpacing(1);
 
     ui->customListWidget->setFocusPolicy(Qt::NoFocus);
     ui->customListWidget->setSelectionMode(QAbstractItemView::NoSelection);
-    ui->customListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    ui->customListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+//    ui->customListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+//    ui->customListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->customListWidget->setSpacing(0);
 //    ui->customListWidget->setFixedHeight((showList.length() * ITEMHEIGH));
 
@@ -156,6 +169,7 @@ void Shortcut::setupComponent(){
     QHBoxLayout *addLyt = new QHBoxLayout;
 
     QLabel * iconLabel = new QLabel();
+    //~ contents_path /shortcut/Add custom shortcut
     QLabel * textLabel = new QLabel(tr("Add custom shortcut"));
     QPixmap pixgray = ImageUtil::loadSvg(":/img/titlebar/add.svg", "black", 12);
     iconLabel->setPixmap(pixgray);
@@ -182,7 +196,8 @@ void Shortcut::setupComponent(){
 
 
 //    ui->addFrame->installEventFilter(this);
-    ui->generalListWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+//    ui->generalListWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->generalListWidget->setSelectionMode(QAbstractItemView::NoSelection);
 
     ui->resetBtn->hide();
 
@@ -191,6 +206,7 @@ void Shortcut::setupComponent(){
 void Shortcut::setupConnect(){
 
     connect(addWgt, &HoverWidget::widgetClicked, this, [=](QString mname){
+        addDialog->setTitleText(QObject::tr("Add Shortcut"));
         addDialog->exec();
     });
 
@@ -247,6 +263,12 @@ void Shortcut::setupConnect(){
             QString value = settings->get(currentEntry->keyStr).toString();
             wItem->setShortcutBinding(value);
 
+            // 同时更新 显示全部快捷键中 对应键值
+            for (int index = 0; index < generalEntries.count(); index++){
+                if (currentEntry->keyStr == generalEntries[index]->keyStr){
+                    generalEntries[index]->valueStr = value;
+                }
+            }
             delete settings;
         }
     });
@@ -289,12 +311,12 @@ void Shortcut::initFunctionStatus(){
     connect(pThread, &QThread::finished, this, [=]{
         //系统快捷键
         appendGeneralItems();
-        ui->generalListWidget->setFixedHeight(ui->generalListWidget->count() * ITEMHEIGH);
+        ui->generalListWidget->setFixedHeight((ui->generalListWidget->count() + 1) * ITEMHEIGH);
         initGeneralItemsStyle();
 
         //自定义快捷键
         appendCustomItems();
-        ui->customListWidget->setFixedHeight(ui->customListWidget->count() * ITEMHEIGH);
+        ui->customListWidget->setFixedHeight((ui->customListWidget->count() + 1) * ITEMHEIGH);
         initCustomItemsStyle();
     });
     connect(pThread, &QThread::finished, pWorker, &GetShortcutWorker::deleteLater);
@@ -327,12 +349,14 @@ void Shortcut::appendGeneralItems(){
             singleWidget->setProperty("userData", QVariant::fromValue(gkeyEntry));
 
             CustomLineEdit * line = singleWidget->lineeditComponent();
+            line->setFocusPolicy(Qt::NoFocus);
             connect(line, &CustomLineEdit::shortcutCodeSignals, this, [=](QList<int> keyCode){
                 newBindingRequest(keyCode);
             });
 
             QListWidgetItem * item = new QListWidgetItem(ui->generalListWidget);
-            item->setSizeHint(QSize(ui->generalListWidget->width(), ITEMHEIGH));
+//            item->setSizeHint(QSize(ui->generalListWidget->width() - 4, ITEMHEIGH));
+            item->setSizeHint(QSize(QSizePolicy::Expanding, ITEMHEIGH));
             item->setData(Qt::UserRole, "");
             ui->generalListWidget->setItemWidget(item, singleWidget);
         }
@@ -367,7 +391,8 @@ void Shortcut::buildCustomItem(KeyEntry * nkeyEntry){
 
 
     QListWidgetItem * item = new QListWidgetItem(ui->customListWidget);
-    item->setSizeHint(QSize(ui->customListWidget->width(), ITEMHEIGH));
+//    item->setSizeHint(QSize(ui->customListWidget->width() - 4, ITEMHEIGH));
+    item->setSizeHint(QSize(QSizePolicy::Expanding, ITEMHEIGH));
     item->setData(Qt::UserRole, nkeyEntry->gsPath);
     ui->customListWidget->setItemWidget(item, singleWidget);
 
@@ -378,7 +403,7 @@ void Shortcut::buildCustomItem(KeyEntry * nkeyEntry){
 
         delete obItem;
 
-        ui->customListWidget->setFixedHeight(ui->customListWidget->count() * ITEMHEIGH);
+        ui->customListWidget->setFixedHeight((ui->customListWidget->count() + 1) * ITEMHEIGH);
 
         initCustomItemsStyle();
 
@@ -437,7 +462,7 @@ void Shortcut::createNewShortcut(QString path, QString name, QString exec){
         KeyEntry * nKeyentry = new KeyEntry;
         nKeyentry->gsPath = availablepath;
         nKeyentry->nameStr = name;
-        nKeyentry->bindingStr = DEFAULT_BINDING;
+        nKeyentry->bindingStr = tr("disable");
         nKeyentry->actionStr = exec;
 
         customEntries.append(nKeyentry);
@@ -445,7 +470,7 @@ void Shortcut::createNewShortcut(QString path, QString name, QString exec){
         /*********刷新界面(添加)******/
         buildCustomItem(nKeyentry);
 
-        ui->customListWidget->setFixedHeight(ui->customListWidget->count() * ITEMHEIGH);
+        ui->customListWidget->setFixedHeight((ui->customListWidget->count() + 1) * ITEMHEIGH);
 
         initCustomItemsStyle();
         /******************/
@@ -486,7 +511,7 @@ void Shortcut::createNewShortcut(QString path, QString name, QString exec){
     const QByteArray idd(availablepath.toLatin1().data());
     QGSettings * settings = new QGSettings(id, idd);
 
-    settings->set(BINDING_KEY, DEFAULT_BINDING);
+    settings->set(BINDING_KEY, tr("disable"));
     settings->set(NAME_KEY, name);
     settings->set(ACTION_KEY, exec);
 
@@ -497,19 +522,29 @@ void Shortcut::deleteCustomShortcut(QString path){
     if (path.isEmpty())
         return;
 
-    gboolean ret;
-    GError ** error = NULL;
+//    gboolean ret;
+//    GError ** error = NULL;
+    QProcess p(0);
+    QStringList args;
 
     char * fullpath = path.toLatin1().data();
+    QString cmd = "dconf";
 
-    DConfClient * client = dconf_client_new ();
+    args.append("reset");
+    args.append("-f");
+    args.append(fullpath);
+    p.execute(cmd,args);//command是要执行的命令,args是参数
+    qDebug()<<"wait for finish";
+    p.waitForFinished(-1);
+    qDebug()<<QString::fromLocal8Bit(p.readAllStandardError());
+//    DConfClient * client = dconf_client_new ();
 
-    ret = dconf_client_write_sync (client, fullpath, NULL, NULL, NULL, error);
+//    ret = dconf_client_write_sync (client, fullpath, NULL, NULL, NULL, error);
 
-    if (!ret)
-        qDebug() << "Delete Custom ShortCut Failed!";
+//    if (!ret)
+//        qDebug() << "Delete Custom ShortCut Failed!";
 
-    g_object_unref (client);
+//    g_object_unref (client);
 }
 
 void Shortcut::newBindingRequest(QList<int> keyCode){
@@ -522,36 +557,64 @@ void Shortcut::newBindingRequest(QList<int> keyCode){
     KeyEntry * nkeyEntry = widgetItem->property("userData").value<KeyEntry *>();
 
     QString shortcutString = getBindingName(keyCode);
-
+    int len = shortcutString.length();
     //check for unmodified keys
-    if (keyCode.count() == 1){
-        if (shortcutString.contains(QRegExp("[a-z]")) ||
-                shortcutString.contains(QRegExp("[0-9]")) ||
-                keyIsForbidden(shortcutString)){
-            qDebug() << "Please try with a key such as Control, Alt or Shift at the same time.";
-            return;
-        }
-    }
-
-    /* flag to see if the new accelerator was in use by something */
-    for (KeyEntry * ckeyEntry : generalEntries){
-        if (shortcutString == ckeyEntry->valueStr){
-            qDebug() << QString("The shortcut \"%1\" is already used for\n\"%2\",please reset!!!").arg(shortcutString).arg(ckeyEntry->keyStr);
-            return;
-        }
-    }
-
-    current->setText(shortcutString);
-
-    //已经设置了值，清除焦点不再监听
-    current->clearFocus();
-
     if (nkeyEntry->gsPath.isEmpty()){ //非自定义快捷键的修改
+        if (keyCode.count() == 1 && shortcutString.length() <= 1){
+            if (shortcutString.contains(QRegExp("[a-z]")) ||
+                    shortcutString.contains(QRegExp("[0-9]")) ||
+                    keyIsForbidden(shortcutString)){
+                const QByteArray iid(nkeyEntry->gsSchema.toLatin1().data());
+                QGSettings * settings = new QGSettings(iid);
+                current->setText(settings->get(nkeyEntry->keyStr).toString());
+                current->updateOldShow(settings->get(nkeyEntry->keyStr).toString());
+                current->clearFocus();
+                qDebug() << "Please try with a key such as Control, Alt or Shift at the same time.";
+                delete settings;
+                return;
+            }
+        }
+
+        if(shortcutString.isEmpty()){   //fn
+            qDebug() << "the key is null";
+            const QByteArray iid(nkeyEntry->gsSchema.toLatin1().data());
+            QGSettings * settings = new QGSettings(iid);
+
+            current->setText(settings->get(nkeyEntry->keyStr).toString());
+            current->updateOldShow(settings->get(nkeyEntry->keyStr).toString());
+            current->clearFocus();
+            delete settings;
+            return;
+        }
+        if(shortcutString.endsWith(">")){   //special key
+            qDebug() << "end with >";
+            const QByteArray iid(nkeyEntry->gsSchema.toLatin1().data());
+            QGSettings * settings = new QGSettings(iid);
+
+            current->setText(settings->get(nkeyEntry->keyStr).toString());
+            current->updateOldShow(settings->get(nkeyEntry->keyStr).toString());
+            current->clearFocus();
+            delete settings;
+            return;
+        }
+        /* flag to see if the new accelerator was in use by something */
+        for (KeyEntry * ckeyEntry : generalEntries){
+            if (shortcutString == ckeyEntry->valueStr){
+                const QByteArray iid(nkeyEntry->gsSchema.toLatin1().data());
+                QGSettings * settings = new QGSettings(iid);
+
+                current->setText(settings->get(nkeyEntry->keyStr).toString());
+                current->updateOldShow(settings->get(nkeyEntry->keyStr).toString());
+                current->clearFocus();
+                qDebug() << QString("The shortcut \"%1\" is already used for\n\"%2\",please reset!!!").arg(shortcutString).arg(ckeyEntry->keyStr);
+                delete settings;
+                return;
+            }
+        }
         const QByteArray iid(nkeyEntry->gsSchema.toLatin1().data());
         QGSettings * settings = new QGSettings(iid);
 
         settings->set(nkeyEntry->keyStr, shortcutString);
-
         delete settings;
 
         //更新
@@ -560,14 +623,93 @@ void Shortcut::newBindingRequest(QList<int> keyCode){
                 generalEntries[index]->valueStr = shortcutString;
             }
         }
+    }else { //自定义快捷键的修改
+        qDebug() << "custom key";
 
-    } else { //自定义快捷键的修改
+        if(shortcutString.isEmpty()){   //fn
+            current->setText(nkeyEntry->bindingStr);
+            current->updateOldShow(nkeyEntry->bindingStr);
+            current->clearFocus();
+            qDebug() << "Please try with a valid key.";
+            return;
+        }
+        if(shortcutString.endsWith(">")){   //special key
+            current->setText(nkeyEntry->bindingStr);
+            current->updateOldShow(nkeyEntry->bindingStr);
+            current->clearFocus();
+            qDebug() << "Please try with a valid key value";
+            return;
+        }
+        /* flag to see if the new accelerator was in use by something */
+        for (KeyEntry * ckeyEntry : generalEntries){
+            if (shortcutString == ckeyEntry->valueStr){
+                current->setText(nkeyEntry->bindingStr);
+                current->updateOldShow(nkeyEntry->bindingStr);
+                current->clearFocus();
+                qDebug() << QString("The shortcut \"%1\" is already used for\n\"%2\",please reset!!!").arg(shortcutString).arg(ckeyEntry->keyStr);
+                return;
+            }
+        }
+        if (keyCode.count() == 1){
+            if (shortcutString.contains(QRegExp("[a-z]")) ||
+                    shortcutString.contains(QRegExp("[0-9]")) ||
+                    keyIsForbidden(shortcutString)){
+                current->setText(nkeyEntry->bindingStr);
+                current->updateOldShow(nkeyEntry->bindingStr);
+                current->clearFocus();
+                qDebug() << "Please try with a key such as Control, Alt or Shift at the same time.";
+                return;
+            }
+        }
+        if (keyCode.count() == 2){
+            if (shortcutString == "<Control>F1"){
+                current->setText(nkeyEntry->bindingStr);
+                current->updateOldShow(nkeyEntry->bindingStr);
+                current->clearFocus();
+                qDebug() << "Please try with a valid key.";
+                return;
+            } else if (shortcutString.startsWith("<")){
+                int len = shortcutString.length();
+                for(int i = 0; i < len; i++){
+                    if(shortcutString.at(i) == '>'){
+                        len = len - i - 1;
+                        break;
+                    }
+                }
+                if(len > 3)
+                {
+                    current->setText(nkeyEntry->bindingStr);
+                    current->updateOldShow(nkeyEntry->bindingStr);
+                    current->clearFocus();
+                    return;
+                }
+            }
+        }
+        if(keyCode.count() == 3){
+            int len = shortcutString.length();
+            int count = 0;
+            for(int i = 0; i < len; i++){
+                if(shortcutString.at(i) == '>'){
+                    count += 1;
+                    if(count == 2){
+                        len = len - i - 1;
+                        break;
+                    }
+                }
+            }
+            if(len > 3)
+            {
+                current->setText(nkeyEntry->bindingStr);
+                current->updateOldShow(nkeyEntry->bindingStr);
+                current->clearFocus();
+                return;
+            }
+        }
+
         const QByteArray id(KEYBINDINGS_CUSTOM_SCHEMA);
         const QByteArray idd(nkeyEntry->gsPath.toLatin1().data());
         QGSettings * settings = new QGSettings(id, idd);
-
         settings->set(BINDING_KEY, shortcutString);
-
         delete settings;
 
         //更新
@@ -577,6 +719,11 @@ void Shortcut::newBindingRequest(QList<int> keyCode){
             }
         }
     }
+
+    current->setText(shortcutString);
+    current->updateOldShow(shortcutString);
+    //已经设置了值，清除焦点不再监听
+    current->clearFocus();
 }
 
 /**
@@ -588,7 +735,11 @@ QString Shortcut::getBindingName(QList<int> keyCode){
     QStringList tmpList;
     for (int keycode : keyCode){
         if (keycode >= 16777216 && keycode <= 16777254){ //1677216=Escape; 16777254=ScrollLock
-            tmpList.append(QString("<%1>").arg(pKeyMap->keycodeTokeystring(keycode)));
+            if(keycode == 16777223 || keycode == 16777225){ // 16777223=Delete  16777225=Print
+                tmpList.append(pKeyMap->keycodeTokeystring(keycode));
+            }else {
+                tmpList.append(QString("<%1>").arg(pKeyMap->keycodeTokeystring(keycode)));
+            }
         }
         else if (keycode >= 48 && keycode <= 57){ // 48 = 0; 57 = 9
             QString str = pKeyMap->keycodeTokeystring(keycode);
@@ -610,6 +761,17 @@ bool Shortcut::keyIsForbidden(QString key){
             return true;
     }
     return false;
+}
+
+void Shortcut::shortcutChangedSlot(){
+    qDebug() << "receive cloud service signal";
+    for(int i = 0; i < ui->customListWidget->count(); i++){
+        QListWidgetItem * obItem =  ui->customListWidget->takeItem(i);
+        delete obItem;
+    }
+    appendCustomItems();
+    ui->customListWidget->setFixedHeight((ui->customListWidget->count() + 1) * ITEMHEIGH);
+    initCustomItemsStyle();
 }
 
 //bool Shortcut::eventFilter(QObject *watched, QEvent *event){

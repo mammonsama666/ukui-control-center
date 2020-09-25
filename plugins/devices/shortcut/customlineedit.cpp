@@ -25,7 +25,7 @@ CustomLineEdit::CustomLineEdit(QString shortcut, QWidget *parent) :
     QLineEdit(parent),
     _oldshortcut(shortcut)
 {
-    _wait = "New Shortcut...";
+    _wait = tr("New Shortcut...");
 
     flag = true;
     setFocusPolicy(Qt::ClickFocus);
@@ -114,4 +114,8 @@ void CustomLineEdit::keyReleaseEvent(QKeyEvent *evt){
 //        this->clearFocus();
     }
 
+}
+
+void CustomLineEdit::updateOldShow(QString newStr){
+    _oldshortcut = newStr;
 }
