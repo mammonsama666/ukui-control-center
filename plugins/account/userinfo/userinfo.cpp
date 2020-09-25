@@ -1,4 +1,4 @@
- /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * Copyright (C) 2019 Tianjin KYLIN Information Technology Co., Ltd.
  *
@@ -30,6 +30,7 @@
 #include "SwitchButton/switchbutton.h"
 #include "ImageUtil/imageutil.h"
 #include "elipsemaskwidget.h"
+#include "passwdcheckutil.h"
 
 /* qt会将glib里的signals成员识别为宏，所以取消该宏
  * 后面如果用到signals时，使用Q_SIGNALS代替即可
@@ -54,18 +55,20 @@ UserInfo::UserInfo()
     pluginWidget->setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(pluginWidget);
 
-    pluginName = tr("Userinfo");
+    pluginName = tr("User Info");
     pluginType = ACCOUNT;
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
+    ui->title2Label->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
 
     //构建System dbus调度对象
     sysdispatcher = new SystemDbusDispatcher;
 
+    ui->changeGroupBtn->hide();
 
     //获取系统全部用户信息，用户Uid大于等于1000的
     _acquireAllUsersInfo();
 
-
+    initSearchText();
     readCurrentPwdConf();
     initComponent();
     initAllUserStatus();
@@ -111,6 +114,24 @@ void UserInfo::plugin_delay_control(){
 
 }
 
+const QString UserInfo::name() const {
+
+    return QStringLiteral("userinfo");
+}
+
+void UserInfo::initSearchText() {
+    //~ contents_path /userinfo/Change pwd
+    ui->changePwdBtn->setText(tr("Change pwd"));
+    //~ contents_path /userinfo/Change type
+    ui->changeTypeBtn->setText(tr("Change type"));
+    //~ contents_path /userinfo/Change valid
+    ui->changeValidBtn->setText(tr("Change valid"));
+    //~ contents_path /userinfo/Login no passwd
+    ui->loginpwdLabel->setText(tr("Login no passwd"));
+    //~ contents_path /userinfo/enable autoLogin
+    ui->autologinLabel->setText(tr("enable autoLogin"));
+}
+
 QString UserInfo::_accountTypeIntToString(int type){
     QString atype;
     if (type == STANDARDUSER)
@@ -137,8 +158,15 @@ void UserInfo::_acquireAllUsersInfo(){
         allUserInfoMap.insert(user.username, user);
     }
 
-    //处理root登录
-
+    if (allUserInfoMap.isEmpty()) {
+        ui->currentUserFrame->setVisible(false);
+        ui->autoLoginFrame->setVisible(false);
+        ui->liveFrame->setVisible(true);
+    } else {
+        ui->currentUserFrame->setVisible(true);
+        ui->autoLoginFrame->setVisible(true);
+        ui->liveFrame->setVisible(false);
+    }
 }
 
 UserInfomation UserInfo::_acquireUserInfo(QString objpath){
@@ -218,6 +246,12 @@ void UserInfo::readCurrentPwdConf(){
         qDebug() << "Reading pwquality configuration file failed: " << pwquality_strerror(buf, sizeof(buf), ret, auxerror);
     } else {
         enablePwdQuality = true;
+    }
+
+    if (PasswdCheckUtil::getCurrentPamState()){
+        enablePwdQuality = true;
+    } else {
+        enablePwdQuality = false;
     }
 
     if (enablePwdQuality){
@@ -365,7 +399,9 @@ void UserInfo::initComponent(){
 
     ui->addLyt->addWidget(addWgt);
 
-    nopwdSwitchBtn = new SwitchButton(ui->nopwdLoginFrame);
+    ui->nopwdHorLayout->setSpacing(0);
+    ui->nopwdHorLayout->setMargin(0);
+    nopwdSwitchBtn = new SwitchButton(ui->nopwdLoginWidget);
     ui->nopwdHorLayout->addWidget(nopwdSwitchBtn);
 
     autoLoginSwitchBtn = new SwitchButton(ui->autoLoginFrame);
@@ -410,6 +446,11 @@ void UserInfo::initComponent(){
 
         showChangeValidDialog(user.username);
 
+    });
+
+    connect(ui->changeGroupBtn, &QPushButton::clicked, this, [=](bool checked){
+        Q_UNUSED(checked)
+        showChangeGroupDialog();
     });
 
     //修改当前用户免密登录
@@ -549,6 +590,8 @@ void UserInfo::_buildWidgetForItem(UserInfomation user){
     baseWidget->setMaximumSize(960,50);
     baseWidget->setAttribute(Qt::WA_DeleteOnClose);
 
+    //ui->currentUserFrame->setContentsMargins(16,0,16,0);
+
     QHBoxLayout * baseVerLayout = new QHBoxLayout(baseWidget);
     baseVerLayout->setSpacing(0);
     baseVerLayout->setMargin(0);
@@ -585,7 +628,10 @@ void UserInfo::_buildWidgetForItem(UserInfomation user){
     QString btnQss = QString("QPushButton{background: #ffffff; border-radius: 4px;}");
 
     QPushButton * typeBtn = new QPushButton(widget);
-    typeBtn->setFixedSize(88, 36);
+//    typeBtn->setFixedSize(88, 36);
+    typeBtn->setFixedHeight(36);
+    typeBtn->setMinimumWidth(88);
+    typeBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     typeBtn->setText(tr("Change type"));
 //    typeBtn->setStyleSheet(btnQss);
     connect(typeBtn, &QPushButton::clicked, this, [=](bool checked){
@@ -595,7 +641,10 @@ void UserInfo::_buildWidgetForItem(UserInfomation user){
     typeBtn->hide();
 
     QPushButton * pwdBtn = new QPushButton(widget);
-    pwdBtn->setFixedSize(88, 36);
+//    pwdBtn->setFixedSize(88, 36);
+    pwdBtn->setFixedHeight(36);
+    pwdBtn->setMinimumWidth(88);
+    pwdBtn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     pwdBtn->setText(tr("Change pwd"));
 //    pwdBtn->setStyleSheet(btnQss);
     connect(pwdBtn, &QPushButton::clicked, this, [=](bool checked){
@@ -639,14 +688,14 @@ void UserInfo::_buildWidgetForItem(UserInfomation user){
     baseHorLayout->addWidget(delBtn, Qt::AlignVCenter);
     baseHorLayout->addSpacing(4);
 
-
     baseVerLayout->addLayout(baseHorLayout);
 //    baseVerLayout->addStretch();
 
     baseWidget->setLayout(baseVerLayout);
 
     QListWidgetItem * item = new QListWidgetItem(ui->listWidget);
-    item->setSizeHint(QSize(ui->listWidget->width() - 2, ITEMHEIGH));
+//    item->setSizeHint(QSize(ui->listWidget->width() - 4, ITEMHEIGH));
+    item->setSizeHint(QSize(QSizePolicy::Expanding, ITEMHEIGH));
     item->setData(Qt::UserRole, QVariant(user.objpath));
     ui->listWidget->setItemWidget(item, baseWidget);
 
@@ -667,6 +716,15 @@ void UserInfo::showCreateUserDialog(){
         createUser(uName, pwd, pin, aType);
     });
     dialog->exec();
+}
+
+QStringList UserInfo::getUsersList()
+{
+    QStringList usersStringList;
+    for (QVariant tmp : allUserInfoMap.keys()){
+        usersStringList << tmp.toString();
+    }
+    return usersStringList;
 }
 
 void UserInfo::createUser(QString username, QString pwd, QString pin, int atype){
@@ -716,8 +774,8 @@ void UserInfo::deleteUser(bool removefile, QString username){
     UserInfomation user = (UserInfomation)(allUserInfoMap.find(username).value());
 
     // hidden the item when click delete user button
-    QListWidgetItem *item =  otherUserItemMap.find(user.objpath).value();
-    ui->listWidget->setItemHidden(item, true);
+//    QListWidgetItem *item =  otherUserItemMap.find(user.objpath).value();
+//    ui->listWidget->setItemHidden(item, true);
 
     sysdispatcher->delete_user(user.uid, removefile);
 }
@@ -742,6 +800,11 @@ void UserInfo::deleteUserDone(QString objpath){
 
     //重置其他用户ListWidget高度
     _resetListWidgetHeigh();
+}
+
+void UserInfo::showChangeGroupDialog(){
+    ChangeGroupDialog * dialog = new ChangeGroupDialog();
+    dialog->exec();
 }
 
 void UserInfo::showChangeValidDialog(QString username){
