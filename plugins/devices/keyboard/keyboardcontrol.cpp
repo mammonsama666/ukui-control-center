@@ -109,24 +109,14 @@ void KeyboardControl::plugin_delay_control(){
 
 }
 
-void KeyboardControl::setupStylesheet(){
-//    pluginWidget->setStyleSheet("background: #ffffff;");
+const QString KeyboardControl::name() const {
 
-//    ui->repeatWidget_0->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-//    ui->repeatWidget_1->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-//    ui->repeatWidget_2->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
+   return QStringLiteral("keyboard");
+}
 
-//    ui->repeatWidget_3->setStyleSheet("QWidget#repeatWidget_3{background: #F4F4F4; border-radius: 6px;}");
-//    ui->repeatLabel_3->setStyleSheet("QLabel{background: #F4F4F4; font-size: 14px; color: #D9000000;}");
-
-//    ui->repeatWidget_4->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-//    ui->repeatWidget_5->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-
-
-//    ui->layoutWidget_0->setStyleSheet("QWidget#layoutWidget_0{background: #F4F4F4; border-radius: 6px;}");
-//    ui->layoutLabel_0->setStyleSheet("QLabel{background: #F4F4F4; font-size: 14px; color: #D9000000;}");
-
-//    ui->layoutWidget_1->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
+void KeyboardControl::setupStylesheet() {
+    ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
+    ui->title2Label->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
 }
 
 void KeyboardControl::setupComponent(){
