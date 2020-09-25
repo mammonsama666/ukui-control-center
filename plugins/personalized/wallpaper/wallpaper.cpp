@@ -19,15 +19,14 @@
  */
 #include "wallpaper.h"
 #include "ui_wallpaper.h"
-
-#include <QDBusReply>
-#include <QDBusInterface>
-
 #include "pictureunit.h"
 #include "MaskWidget/maskwidget.h"
 
+#include <QDBusReply>
+#include <QDBusInterface>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QProcess>
 
 const QString kylinUrl = "https://www.ubuntukylin.com/wallpaper.html";
 
@@ -56,6 +55,7 @@ Wallpaper::Wallpaper()
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
 
     settingsCreate = false;
+    initSearchText();
     //初始化控件
     setupComponent();
     //初始化gsettings
@@ -95,6 +95,22 @@ QWidget *Wallpaper::get_plugin_ui(){
 void Wallpaper::plugin_delay_control(){
 }
 
+const QString Wallpaper::name() const {
+
+    return QStringLiteral("wallpaper");
+}
+
+void Wallpaper::initSearchText() {
+    //~ contents_path /wallpaper/Select from
+    ui->selectLabel->setText(tr("Select from"));
+    //~ contents_path /wallpaper/Browser local wp
+    ui->browserLocalwpBtn->setText(tr("Browser local wp"));
+    //~ contents_path /wallpaper/Browser online wp
+    ui->browserOnlinewpBtn->setText(tr("Browser online wp"));
+    //~ contents_path /wallpaper/Reset to default
+    ui->resetBtn->setText(tr("Reset to default"));
+}
+
 void Wallpaper::setupComponent(){
 
 //    ui->browserLocalwpBtn->hide();
@@ -108,8 +124,8 @@ void Wallpaper::setupComponent(){
 //    ui->formComBox->addItem(formList.at(2), SLIDESHOW);
 
     //预览遮罩
-    MaskWidget * maskWidget = new MaskWidget(ui->previewLabel);
-    maskWidget->setGeometry(0, 0, ui->previewLabel->width(), ui->previewLabel->height());
+//    MaskWidget * maskWidget = new MaskWidget(ui->previewLabel);
+//    maskWidget->setGeometry(0, 0, ui->previewLabel->width(), ui->previewLabel->height());
 
     ///图片背景
     picFlowLayout = new FlowLayout(ui->picListWidget);
@@ -135,6 +151,7 @@ void Wallpaper::setupComponent(){
     addLyt->addWidget(textLabel);
     addLyt->addStretch();
     colWgt->setLayout(addLyt);
+    ui->horizontalLayout_7->addWidget(colWgt);
 
     // 悬浮改变Widget状态
     connect(colWgt, &HoverWidget::enterWidget, this, [=](QString mname){
@@ -151,7 +168,7 @@ void Wallpaper::setupComponent(){
         iconLabel->setPixmap(pixgray);
         textLabel->setStyleSheet("color: palette(windowText);");
     });
-
+    //打开自定义颜色面板
     connect(colWgt, &HoverWidget::widgetClicked,[=](QString mname){
         Q_UNUSED(mname);
         colordialog = new ColorDialog();
@@ -169,8 +186,9 @@ void Wallpaper::setupComponent(){
     ui->picOptionsComBox->addItem(tr("spanned"), "spanned");
 
     //屏蔽背景放置方式无效
-    ui->picOptionsComBox->hide();
-    ui->picOptionsLabel->hide();
+    //ui->picOptionsComBox->hide();
+    //ui->picOptionsLabel->hide();
+    //ui->switchFrame_2->hide();
 
     //屏蔽纯色背景的确定按钮
     ui->cancelBtn->hide();
@@ -202,9 +220,9 @@ void Wallpaper::setupConnect(){
 
     pObject->moveToThread(pThread);
     connect(pThread, &QThread::started, pObject, &WorkerObject::run);
-    connect(pThread, &QThread::finished, this, [=]{
+//    connect(pThread, &QThread::finished, this, [=](){
 //        if (ui->formComBox->currentIndex() == PICTURE){
-            //设置当前壁纸放置方式
+//           设置当前壁纸放置方式
 //            if (wallpaperinfosMap.contains(filename)){
 //                QMap<QString, QString> currentwpMap = wallpaperinfosMap.value(filename);
 //                if (currentwpMap.contains("options")){
@@ -215,7 +233,12 @@ void Wallpaper::setupConnect(){
 //                }
 //            }
 //        }
+//    });
+    connect(pThread, &QThread::finished, this, [=](){
+
+
     });
+
     connect(pThread, &QThread::finished, pObject, &WorkerObject::deleteLater);
 
     pThread->start();
@@ -245,20 +268,18 @@ void Wallpaper::setupConnect(){
         button->setStyleSheet(btnQss);
 
         connect(button, &QPushButton::clicked, [=]{
-
             QString widgetQss = QString("QWidget{background: %1; border-radius: 6px;}").arg(color);
             ui->previewWidget->setStyleSheet(widgetQss);
 
             ///设置系统纯色背景
             bgsettings->set(FILENAME, "");
             bgsettings->set(PRIMARY, QVariant(color));
+            bgsettings->set(SECONDARY, QVariant(color));
 
             ui->previewStackedWidget->setCurrentIndex(COLOR);
         });
         colorFlowLayout->addWidget(button);
-
     }
-    colorFlowLayout->addWidget(colWgt);
 
 #if QT_VERSION <= QT_VERSION_CHECK(5, 12, 0)
     connect(ui->formComBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [=](int index){
@@ -270,9 +291,17 @@ void Wallpaper::setupConnect(){
         int currentPage = ui->formComBox->currentData(Qt::UserRole).toInt();
         ui->substackedWidget->setCurrentIndex(currentPage);
 
-        if (currentPage == PICTURE){
-
-        } else if (currentPage == COLOR){
+        if (currentPage == COLOR){
+            ui->picOptionsComBox->hide();
+            ui->picOptionsLabel->hide();
+            ui->switchFrame_2->hide();
+        } else if (currentPage == PICTURE){
+            //ui->picOptionsComBox->show();
+            //ui->picOptionsLabel->show();
+            //ui->switchFrame_2->show();
+            ui->picOptionsComBox->hide();
+            ui->picOptionsLabel->hide();
+            ui->switchFrame_2->hide();
         }
 
     });
@@ -359,9 +388,15 @@ void Wallpaper::showComponent(int index){
     if (PICTURE == index){ //图片
 //        ui->picOptionsComBox->show();
 //        ui->picOptionsLabel->show();
+        ui->picOptionsComBox->hide();
+        ui->picOptionsLabel->hide();
+        ui->switchFrame_2->hide();
     } else if (COLOR == index){ //纯色
 //        ui->picOptionsComBox->hide();
 //        ui->picOptionsLabel->hide();
+        ui->picOptionsComBox->hide();
+        ui->picOptionsLabel->hide();
+        ui->switchFrame_2->hide();
     } else { //幻灯片
 
     }
@@ -380,15 +415,16 @@ void Wallpaper::initPreviewStatus(){
     //设置纯色背景的预览效果
     QString color = bgsettings->get(PRIMARY).toString();
     if (!color.isEmpty()){
-        QString widgetQss = QString("QWidget{background: %1; border-radius: 6px;}").arg(color);
+        QString widgetQss = QString("QWidget{background: %1;}").arg(color);
         ui->previewWidget->setStyleSheet(widgetQss);
     }
 }
 
+//自定义颜色面板选定颜色
 void Wallpaper::colorSelectedSlot(QColor color){
     qDebug() << "colorSelectedSlot" << color << color.name();
 
-    QString widgetQss = QString("QWidget{background: %1; border-radius: 6px;}").arg(color.name());
+    QString widgetQss = QString("QWidget{background: %1;}").arg(color.name());
     ui->previewWidget->setStyleSheet(widgetQss);
 
     ///设置系统纯色背景
@@ -457,12 +493,13 @@ void Wallpaper::resetDefaultWallpaperSlot(){
 }
 
 void Wallpaper::showLocalWpDialog(){
-    QString filters = "Wallpaper files(*.png *.jpg)";
+    QStringList filters;
+    filters<<tr("Wallpaper files(*.jpg *.jpeg *.bmp *.dib *.png *.jfif *.jpe *.gif *.tif *.tiff *.wdp)")<<tr("allFiles(*.*)");
     QFileDialog fd;
     fd.setDirectory(QString(const_cast<char *>(g_get_user_special_dir(G_USER_DIRECTORY_PICTURES))));
     fd.setAcceptMode(QFileDialog::AcceptOpen);
     fd.setViewMode(QFileDialog::List);
-    fd.setNameFilter(filters);
+    fd.setNameFilters(filters);
     fd.setFileMode(QFileDialog::ExistingFile);
     fd.setWindowTitle(tr("select custom wallpaper file"));
     fd.setLabelText(QFileDialog::Accept, tr("Select"));
@@ -476,10 +513,20 @@ void Wallpaper::showLocalWpDialog(){
     QString selectedfile;
     selectedfile = fd.selectedFiles().first();
 
+    QStringList fileRes = selectedfile.split("/");
 
-    ///TODO: chinese and space support
+    QProcess * process = new QProcess();
+    QString program("cp");
+    QStringList arguments;
+    arguments << selectedfile ;
+    arguments << "/tmp";
+    process->start(program, arguments);
+
+    QString bgfile = "/tmp/" + fileRes.at(fileRes.length() - 1);
+
+    // TODO: chinese and space support
 //    if (g_file_test(selectedfile.toLatin1().data(), G_FILE_TEST_EXISTS)) {
-        bgsettings->set(FILENAME, QVariant(selectedfile));
+        bgsettings->set(FILENAME, QVariant(bgfile));
 //    } else {
 //        bgsettings->reset(FILENAME);
 //    }
