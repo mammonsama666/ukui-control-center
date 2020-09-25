@@ -83,7 +83,6 @@ public:
     const QString name() const  Q_DECL_OVERRIDE;
 
 public:
-    void initSearchText();
     void setupStylesheet();
     void setupComponent();
     void setupConnect();
