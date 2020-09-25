@@ -21,6 +21,7 @@
 #include "ui_changepwddialog.h"
 
 #include "elipsemaskwidget.h"
+#include "passwdcheckutil.h"
 
 #include <QStyledItemDelegate>
 
@@ -40,6 +41,7 @@ ChangePwdDialog::ChangePwdDialog(QWidget *parent) :
     setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_DeleteOnClose);
+    setWindowTitle(tr("Change pwd"));
 
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
     ui->closeBtn->setProperty("useIconHighlightEffect", true);
@@ -48,20 +50,7 @@ ChangePwdDialog::ChangePwdDialog(QWidget *parent) :
     ui->closeBtn->setStyleSheet("QPushButton:hover:!pressed#closeBtn{background: #FA6056; border-radius: 4px;}"
                                 "QPushButton:hover:pressed#closeBtn{background: #E54A50; border-radius: 4px;}");
 
-//    ui->frame->setStyleSheet("QFrame{background: #ffffff; border: none; border-radius: 6px;}");
-//    ui->closeBtn->setStyleSheet("QPushButton{background: #ffffff; border: none;}");
-//    ui->pwdLineEdit->setStyleSheet("QLineEdit{background: #F4F4F4; border: none; border-radius: 4px;}");
-//    ui->pwdsureLineEdit->setStyleSheet("QLineEdit{background: #F4F4F4; border: none; border-radius: 4px;}");
-
-
-    //构建Combox代理，否则样式不全部生效
-//    ui->pwdtypeComboBox->setItemDelegate(itemDelege);
-//    ui->pwdtypeComboBox->setMaxVisibleItems(5);
-//    ui->pwdtypeComboBox->setStyleSheet("QComboBox{background: #F4F4F4; border-radius: 4px; font-size:14px;padding-left: 8px; color: black; min-height: 30px; combobox-popup: 0;}"
-//                                     "QComboBox::down-arrow{image:url(://img/dropArrow/downpx.png)}"
-//                                     "QComboBox::drop-down{width: 30px; border: none;}"
-//                                     "");
-
+    ui->pwdFrame->setFrameShape(QFrame::Shape::Box);
 
     ui->closeBtn->setIcon(QIcon("://img/titlebar/close.svg"));
 
@@ -96,6 +85,12 @@ void ChangePwdDialog::initPwdChecked(){
     } else {
         enablePwdQuality = true;
     }
+
+    if (PasswdCheckUtil::getCurrentPamState())
+        enablePwdQuality = true;
+    else
+        enablePwdQuality = false;
+
 #else
     enablePwdQuality = false;
 #endif
@@ -106,7 +101,7 @@ void ChangePwdDialog::setupComponent(){
     ElipseMaskWidget * cpMaskWidget = new ElipseMaskWidget(ui->faceLabel);
     cpMaskWidget->setGeometry(0, 0, ui->faceLabel->width(), ui->faceLabel->height());
 
-    ui->pwdtypeComboBox->addItem(tr("General Pwd"));
+    ui->pwdtypeComboBox->setText(tr("General Pwd"));
 
     ui->pwdLineEdit->setEchoMode(QLineEdit::Password);
     ui->pwdsureLineEdit->setEchoMode(QLineEdit::Password);
@@ -158,9 +153,9 @@ void ChangePwdDialog::setUsername(QString username){
     ui->usernameLabel->setText(username);
 }
 
-void ChangePwdDialog::setPwdType(QString type){
-    ui->pwdtypeComboBox->setCurrentText(type);
-}
+//void ChangePwdDialog::setPwdType(QString type){
+//    ui->pwdtypeComboBox->setCurrentText(type);
+//}
 
 void ChangePwdDialog::setAccountType(QString aType){
     ui->aTypeLabel->setText(aType);
@@ -181,6 +176,7 @@ void ChangePwdDialog::paintEvent(QPaintEvent *event) {
     pixmapPainter.setRenderHint(QPainter::Antialiasing);
     pixmapPainter.setPen(Qt::transparent);
     pixmapPainter.setBrush(Qt::black);
+    pixmapPainter.setOpacity(0.65);
     pixmapPainter.drawPath(rectPath);
     pixmapPainter.end();
 
@@ -227,13 +223,13 @@ void ChangePwdDialog::pwdLegalityCheck(QString pwd){
 #endif
 
     } else { //系统未开启pwdquality模块
-        if (pwd.length() < PWD_LOW_LENGTH) {
-            pwdTip = tr("Password length needs to more than %1 character!").arg(PWD_LOW_LENGTH - 1);
-        } else if (pwd.length() > PWD_HIGH_LENGTH) {
-            pwdTip = tr("Password length needs to less than %1 character!").arg(PWD_HIGH_LENGTH + 1);
-        } else {
-            pwdTip = "";
-        }
+//        if (pwd.length() < PWD_LOW_LENGTH) {
+//            pwdTip = tr("Password length needs to more than %1 character!").arg(PWD_LOW_LENGTH - 1);
+//        } else if (pwd.length() > PWD_HIGH_LENGTH) {
+//            pwdTip = tr("Password length needs to less than %1 character!").arg(PWD_HIGH_LENGTH + 1);
+//        } else {
+//            pwdTip = "";
+//        }
     }
 
 
