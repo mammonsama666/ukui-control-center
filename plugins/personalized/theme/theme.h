@@ -35,6 +35,7 @@
 #include <QtDBus/QDBusMessage>
 #include <QGSettings>
 #include <QtDBus/QtDBus>
+#include <QAbstractButton>
 
 
 class QPushButton;
@@ -55,13 +56,15 @@ class Theme : public QObject, CommonInterface
 public:
     Theme();
     ~Theme();
-
+    double i=0;
     QString get_plugin_name() Q_DECL_OVERRIDE;
     int get_plugin_type() Q_DECL_OVERRIDE;
     QWidget * get_plugin_ui() Q_DECL_OVERRIDE;
     void plugin_delay_control() Q_DECL_OVERRIDE;
+    const QString name() const  Q_DECL_OVERRIDE;
 
 public:
+    void initSearchText();
     void setupSettings();
     void setupComponent();
     void initThemeMode();
@@ -93,6 +96,7 @@ private:
     QGSettings * qtSettings;
     QGSettings * curSettings;
     QSettings  * kwinSettings;
+    QSettings  * themeSettings;
     QGSettings * kwinGsettings =  nullptr;
     QGSettings * personliseGsettings = nullptr;
 
@@ -107,7 +111,9 @@ private:
 private slots:
     void resetBtnClickSlot();
     // write the kwin's configuration
-    void writeKwinSettings(bool change, QString theme, int effect = 0);
+    void writeKwinSettings(bool change, QString theme, bool effect = false);
+
+    void themeBtnClickSlot(QAbstractButton *button);
 
 };
 
