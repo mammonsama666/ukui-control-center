@@ -50,7 +50,7 @@ ModulePageWidget::ModulePageWidget(QWidget *parent) :
 
 
     //
-    ui->mtitleLabel->setStyleSheet(tr("QLabel{font-size: 18px; color: palette(Shadow);}"));
+    ui->mtitleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(Shadow);}");
     //左侧二级菜单样式
     ui->leftStackedWidget->setStyleSheet("border: none;");
     //上侧二级菜单样式
@@ -92,12 +92,13 @@ void ModulePageWidget::initUI(){
     for (int moduleIndex = 0; moduleIndex < TOTALMODULES; moduleIndex++){
         QListWidget * leftListWidget = new QListWidget;
         leftListWidget->setObjectName("leftWidget");
-        leftListWidget->setStyleSheet("QListWidget::Item:hover{background:palette(base);}");
+//        leftListWidget->setStyleSheet("QListWidget::Item:hover{background:palette(base);}");
         leftListWidget->setAttribute(Qt::WA_DeleteOnClose);
         leftListWidget->setResizeMode(QListView::Adjust);
         leftListWidget->setFocusPolicy(Qt::NoFocus);
         leftListWidget->setSelectionMode(QAbstractItemView::NoSelection);
         leftListWidget->setSpacing(12);
+        leftListWidget->setMinimumWidth(172);
         connect(leftListWidget, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(currentLeftitemChanged(QListWidgetItem*,QListWidgetItem*)));
         QListWidget * topListWidget = new QListWidget;
         topListWidget->setAttribute(Qt::WA_DeleteOnClose);
@@ -124,8 +125,9 @@ void ModulePageWidget::initUI(){
             leftWidgetItem->setLabelPixmap(QString("://img/secondaryleftmenu/%1.svg").arg(single.nameString), single.nameString, "default");
 
             QListWidgetItem * item = new QListWidgetItem(leftListWidget);
-            item->setSizeHint(QSize(ui->leftStackedWidget->width(), 40)); //QSize(120, 40) spacing: 12px;
+            item->setSizeHint(QSize(ui->leftStackedWidget->width() + 48, 40)); //QSize(120, 40) spacing: 12px;
             leftListWidget->setItemWidget(item, leftWidgetItem);
+            leftListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
             strItemsMap.insert(single.namei18nString, item);
 
