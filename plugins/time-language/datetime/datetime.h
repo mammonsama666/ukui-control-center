@@ -60,7 +60,6 @@ extern "C" {
 #include <gio/gio.h>
 }
 
-
 #define TZ_DATA_FILE "/usr/share/zoneinfo/zoneUtc"
 #define DEFAULT_TZ "Asia/Shanghai"
 
@@ -82,6 +81,7 @@ public:
     int get_plugin_type() Q_DECL_OVERRIDE;
     QWidget * get_plugin_ui() Q_DECL_OVERRIDE;
     void plugin_delay_control() Q_DECL_OVERRIDE;
+    const QString name() const  Q_DECL_OVERRIDE;
 
     void component_init();
     void status_init();
@@ -91,20 +91,17 @@ public:
 private:
     Ui::DateTime *ui;
 
-
     QString pluginName;
     int pluginType;
     QWidget * pluginWidget;
 
     QGSettings * m_formatsettings  = nullptr;
 
-
     QDBusInterface *m_datetimeiface = nullptr;
     QDBusInterface *m_datetimeiproperties = nullptr;
 
     QMap<QString, int> tzindexMapEn;
     QMap<QString, int> tzindexMapCN;
-
 
     SwitchButton *m_formTimeBtn = nullptr;
     QLabel *m_formTimeLabel = nullptr;
@@ -115,8 +112,6 @@ private:
 
     QDateTime current;
 
-//    bool m_EFHour = true;//默认为24小时制
-
 Q_SIGNALS:
     void changed();
 
@@ -125,7 +120,7 @@ private slots:
     void changetime_slot();
     void changezone_slot();
     void changezone_slot(QString );
-    void time_format_clicked_slot(bool);
+    void time_format_clicked_slot(bool, bool);
     void rsync_with_network_slot();
     void showendLabel();
     void hidendLabel();
@@ -134,7 +129,6 @@ private:
     void loadHour();
     void connectGSetting();
     QString getLocalTimezoneName(QString timezone, QString locale);
-
 };
 
 #endif // DATETIME_H
