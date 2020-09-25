@@ -21,20 +21,17 @@
 #define MAINWINDOW_H
 
 #include <QDir>
-#include <QTimer>
 #include <QMainWindow>
 #include <QPaintEvent>
 #include <QShowEvent>
 #include <QMoveEvent>
 #include <QHideEvent>
 #include <QPainter>
-#include <QPropertyAnimation>
+
 #include "interface.h"
 #include "homepagewidget.h"
 #include "modulepagewidget.h"
-#include "searchwidget.h"
 
-class QLabel;
 class QPushButton;
 class QButtonGroup;
 class KeyValueConverter;
@@ -57,7 +54,6 @@ public:
 
     void bootOptionsFilter(QString opt);
     void bootOptionsSwitch(int moduleNum, int funcNum);
-    void setLineEditFocus(QString arg);
 
 protected:
     void paintEvent(QPaintEvent *);
@@ -72,7 +68,6 @@ private:
 
     QButtonGroup * leftBtnGroup;
     QButtonGroup * leftMicBtnGroup; //
-    bool bIsFullScreen;
 
     QDir pluginsDir;
 //    QStringList modulesStringList;
@@ -80,24 +75,8 @@ private:
     QList<QMap<QString, QObject *>> modulesList;
 
     KeyValueConverter * kvConverter;
-    SearchWidget * m_searchWidget;
 
-    QPushButton * backBtn;
-    QPushButton * minBtn;
-    QPushButton * maxBtn;
-    QPushButton * closeBtn;
-    QLabel      * titleLabel;
-    QTimer      * timer;
-    QLabel      * logoLabel;
-    QLabel            *m_queryIcon;
-    QLabel            *m_queryText=nullptr;
-    QPropertyAnimation *m_animation=nullptr;
-    QWidget           *m_queryWid=nullptr;
-    bool              m_isSearching;
-    QString           m_searchKeyWords;
 private:
-    void initUI();
-    void initTileBar();
     void setBtnLayout(QPushButton * &pBtn);
     void loadPlugins();
     void initLeftsideBar();
@@ -106,19 +85,14 @@ private:
 
     // load svg picture
     const QPixmap loadSvg(const QString &fileName, QString color);
-    //Render icon from theme
-    const QPixmap renderSvg(const QIcon &icon, QString color);
     // chang svg picture's color
     QPixmap drawSymbolicColoredPixmap(const QPixmap &source, QString color);
 
     bool dblOnEdge(QMouseEvent *event);
-    void initStyleSheet();
 
 public slots:
     void functionBtnClicked(QObject * plugin);
     void sltMessageReceived(const QString &msg);
-    void switchPage(QString moduleName);
-    void animationFinishedSlot();
 };
 
 #endif // MAINWINDOW_H

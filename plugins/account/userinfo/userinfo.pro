@@ -34,12 +34,6 @@ PKGCONFIG     += gio-2.0 \
 #DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
-    changegroupdialog.cpp \
-    changevaliddialog.cpp \
-    creategroupdialog.cpp \
-    definegroupitem.cpp \
-    delgroupdialog.cpp \
-    editgroupdialog.cpp \
     elipsemaskwidget.cpp \
     userinfo.cpp \
     qtdbus/systemdbusdispatcher.cpp \
@@ -49,15 +43,8 @@ SOURCES += \
     changefacedialog.cpp \
     deluserdialog.cpp \
     createuserdialog.cpp \
-    passwdcheckutil.cpp
 
 HEADERS += \
-    changegroupdialog.h \
-    changevaliddialog.h \
-    creategroupdialog.h \
-    definegroupitem.h \
-    delgroupdialog.h \
-    editgroupdialog.h \
     elipsemaskwidget.h \
     userinfo.h \
     qtdbus/systemdbusdispatcher.h \
@@ -67,14 +54,8 @@ HEADERS += \
     changefacedialog.h \
     deluserdialog.h \
     createuserdialog.h \
-    passwdcheckutil.h
 
 FORMS += \
-    changegroupdialog.ui \
-    changevaliddialog.ui \
-    creategroupdialog.ui \
-    delgroupdialog.ui \
-    editgroupdialog.ui \
     userinfo.ui \
     changepwddialog.ui \
     changetypedialog.ui \

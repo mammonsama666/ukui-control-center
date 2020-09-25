@@ -55,3 +55,6 @@ void Audio::plugin_delay_control(){
 
 }
 
+const QString Audio::name() const {
+    return QStringLiteral("audio");
+}

@@ -20,8 +20,6 @@
 #include "createuserdialog.h"
 #include "ui_createuserdialog.h"
 
-#include "passwdcheckutil.h"
-
 #include <QDebug>
 #include <QDir>
 

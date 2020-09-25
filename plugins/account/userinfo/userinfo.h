@@ -35,7 +35,6 @@
 #include "qtdbus/systemdbusdispatcher.h"
 #include "qtdbus/userdispatcher.h"
 
-#include "changegroupdialog.h"
 #include "changepwddialog.h"
 #include "changefacedialog.h"
 #include "changetypedialog.h"

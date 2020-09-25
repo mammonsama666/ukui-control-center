@@ -30,7 +30,6 @@
 #include "SwitchButton/switchbutton.h"
 #include "ImageUtil/imageutil.h"
 #include "elipsemaskwidget.h"
-#include "passwdcheckutil.h"
 
 /* qt会将glib里的signals成员识别为宏，所以取消该宏
  * 后面如果用到signals时，使用Q_SIGNALS代替即可
@@ -803,8 +802,8 @@ void UserInfo::deleteUserDone(QString objpath){
 }
 
 void UserInfo::showChangeGroupDialog(){
-    ChangeGroupDialog * dialog = new ChangeGroupDialog();
-    dialog->exec();
+//    ChangeGroupDialog * dialog = new ChangeGroupDialog();
+//    dialog->exec();
 }
 
 void UserInfo::showChangeValidDialog(QString username){

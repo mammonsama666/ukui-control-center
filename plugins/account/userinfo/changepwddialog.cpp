@@ -21,7 +21,6 @@
 #include "ui_changepwddialog.h"
 
 #include "elipsemaskwidget.h"
-#include "passwdcheckutil.h"
 
 #include <QStyledItemDelegate>
 
