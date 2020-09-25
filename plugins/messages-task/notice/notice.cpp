@@ -23,20 +23,20 @@
 #include "realizenotice.h"
 #include "commonComponent/HoverWidget/hoverwidget.h"
 
-#define NOTICE_SCHEMA "org.ukui.control-center.notice"
-#define NEW_FEATURE_KEY "show-new-feature"
-#define ENABLE_NOTICE_KEY "enable-notice"
+#define NOTICE_SCHEMA         "org.ukui.control-center.notice"
+#define NEW_FEATURE_KEY       "show-new-feature"
+#define ENABLE_NOTICE_KEY     "enable-notice"
 #define SHOWON_LOCKSCREEN_KEY "show-on-lockscreen"
 
-#define DESKTOPPATH "/usr/share/applications/"
+#define DESKTOPPATH           "/usr/share/applications/"
 
 Notice::Notice()
 {
     ui = new Ui::Notice;
     pluginWidget = new QWidget;
     pluginWidget->setAttribute(Qt::WA_DeleteOnClose);
-    appsName<<"ukui-power-statistics";//<<"kylin-video"<<"kylin-assistant";
-    appsKey<<"电源管理器";//<<"麒麟影音"<<"麒麟助手";
+    appsName<<"ukui-power-statistics";/* <<"kylin-video"<<"kylin-assistant"; */
+    appsKey<<"电源管理器";             /*  <<"麒麟影音"<<"麒麟助手"; */
 
     ui->setupUi(pluginWidget);
 
@@ -51,13 +51,15 @@ Notice::Notice()
     ui->lockscreenWidget->setVisible(false);
 
     ui->title2Label->setContentsMargins(0,0,0,16);
-    ui->applistWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+//    ui->applistWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->applistWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    initSearchText();
     setupGSettings();
     setupComponent();
     initNoticeStatus();
     initOriNoticeStatus();
+//    setHiddenNoticeApp(enableSwitchBtn->isChecked());
 }
 
 Notice::~Notice()
@@ -86,6 +88,19 @@ QWidget * Notice::get_plugin_ui(){
 
 void Notice::plugin_delay_control(){
 
+}
+
+const QString Notice::name() const {
+
+    return QStringLiteral("notice");
+}
+
+void Notice::initSearchText() {
+
+    //~ contents_path /notice/Set the type of notice in the operation center
+    ui->noticeLabel->setText(tr("Set the type of notice in the operation center"));
+    //~ contents_path /notice/Notice Origin
+    ui->title2Label->setText(tr("Notice Origin"));
 }
 
 void Notice::setupComponent(){
@@ -125,12 +140,9 @@ void Notice::initNoticeStatus(){
     newfeatureSwitchBtn->blockSignals(false);
     enableSwitchBtn->blockSignals(false);
     lockscreenSwitchBtn->blockSignals(false);
-
-    setHiddenNoticeApp(enableSwitchBtn->isChecked());
 }
 
 void Notice::initOriNoticeStatus() {
-
     initGSettings();
 
     for (int i = 0; i < appsName.length(); i++)
@@ -138,8 +150,6 @@ void Notice::initOriNoticeStatus() {
         QByteArray ba = QString(DESKTOPPATH + appsName.at(i) + ".desktop").toUtf8();
         GDesktopAppInfo * audioinfo = g_desktop_app_info_new_from_filename(ba.constData());
         QString appname = g_app_info_get_name(G_APP_INFO(audioinfo));
-
-//        qDebug()<<"notify appname is------------->"<<appname<<endl;
 
         //构建Widget
         QFrame * baseWidget = new QFrame();
@@ -202,7 +212,8 @@ void Notice::initOriNoticeStatus() {
         baseWidget->setLayout(baseVerLayout);
 
         QListWidgetItem * item = new QListWidgetItem(ui->applistWidget);
-        item->setSizeHint(QSize(502, 52));
+//        item->setSizeHint(QSize(502, 52));
+        item->setSizeHint(QSize(QSizePolicy::Expanding, 52));
 
         ui->applistWidget->setItemWidget(item, baseWidget);
 //        QString availablepath = findFreePath();
@@ -266,10 +277,6 @@ void Notice::initOriNoticeStatus() {
             QString name = settings->get(NAME_KEY).toString();
             settings->set(MESSAGES_KEY, checked);
         });
-
-
-//        delete newSettings;
-//        delete settings;
     }
 }
 
@@ -298,7 +305,6 @@ void Notice::initGSettings() {
         }
         if (!isExist) {
             path = findFreePath();
-            qDebug()<<"not contains newSettings ----->path"<<path<<endl;
             newSettings = new QGSettings(id, path.toLatin1().data());
             QStringList keys = newSettings->keys();
             if (keys.contains(static_cast<QString>(NAME_KEY)) &&
@@ -312,7 +318,6 @@ void Notice::initGSettings() {
             delete newSettings;
         }
     }
-
 }
 
 void Notice::changeAppstatus(bool checked, QString name, SwitchButton *appBtn) {
@@ -332,9 +337,11 @@ void Notice::changeAppstatus(bool checked, QString name, SwitchButton *appBtn) {
 
 void Notice::setHiddenNoticeApp(bool status)
 {
-    if (status) {
-        ui->applistWidget->setVisible(true);
-    } else {
-        ui->applistWidget->setVisible(false);
+    /*
+     * To prevent jitter, need to be optimized
+     */
+    for (int i = 0; i < ui->applistWidget->count(); i++) {
+        QListWidgetItem * item = ui->applistWidget->item(i);
+        item->setHidden(!status);
     }
 }
