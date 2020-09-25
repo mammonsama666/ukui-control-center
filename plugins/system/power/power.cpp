@@ -64,7 +64,6 @@ Power::Power()
 
     const QByteArray id(POWERMANAGER_SCHEMA);
 
-    setupStylesheet();
     setupComponent();
     isPowerSupply();
     if (QGSettings::isSchemaInstalled(id)){
@@ -102,6 +101,11 @@ void Power::plugin_delay_control(){
 
 }
 
+const QString Power::name() const {
+
+    return QStringLiteral("power");
+}
+
 void Power::isPowerSupply(){
     //ubuntukylin youker DBus interface
     QDBusInterface *brightnessInterface = new QDBusInterface("org.freedesktop.UPower",
@@ -123,25 +127,6 @@ void Power::isPowerSupply(){
         bool status = briginfo.value().toBool();
         ui->batteryBtn->setVisible(status);
     }
-}
-
-void Power::setupStylesheet(){
-//    pluginWidget->setStyleSheet("background: #ffffff;");
-
-//    ui->balanceWidget->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-//    ui->savingWidget->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-//    ui->customWidget->setStyleSheet("QWidget{background: #F4F4F4; border-top-left-radius: 6px; border-top-right-radius: 6px;}");
-//    ui->custom1Widget->setStyleSheet("QWidget{background: #F4F4F4;}");
-//    ui->custom2Widget->setStyleSheet("QWidget{background: #F4F4F4;}"
-//                                     "QWidget#custom2Widget{border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;}");
-
-//    ui->acBtn->setStyleSheet("QPushButton#acBtn:checked{background: #3D6BE5; border-radius: 4px; color: #ffffff;}"
-//                             "QPushButton#acBtn:!checked{background: #ffffff; border-radius: 4px;}");
-//    ui->batteryBtn->setStyleSheet("QPushButton#batteryBtn:checked{background: #3D6BE5; border-radius: 4px; color: #ffffff;}"
-//                                  "QPushButton#batteryBtn:!checked{background: #ffffff; border-radius: 4px; color: #000000;}");
-
-//    ui->iconWidget->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-
 }
 
 void Power::setupComponent(){
