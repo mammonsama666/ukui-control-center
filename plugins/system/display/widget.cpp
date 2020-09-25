@@ -51,22 +51,22 @@ extern "C" {
 #define QML_PATH "kcm_kscreen/qml/"
 
 #define UKUI_CONTORLCENTER_PANEL_SCHEMAS "org.ukui.control-center.panel.plugins"
-#define NIGHT_MODE_KEY "nightmodestatus"
+#define NIGHT_MODE_KEY                   "nightmodestatus"
 
-#define FONT_RENDERING_DPI "org.ukui.SettingsDaemon.plugins.xsettings"
-#define SCALE_KEY "scaling-factor"
+#define FONT_RENDERING_DPI               "org.ukui.SettingsDaemon.plugins.xsettings"
+#define SCALE_KEY                        "scaling-factor"
 
-#define DPI_SCHEMAS "org.ukui.font-rendering"
-#define DPI_KEY "dpi"
+#define DPI_SCHEMAS                      "org.ukui.font-rendering"
+#define DPI_KEY                          "dpi"
 
-#define MOUSE_SIZE_SCHEMAS "org.ukui.peripherals-mouse"
-#define CURSOR_SIZE_KEY "cursor-size"
+#define MOUSE_SIZE_SCHEMAS               "org.ukui.peripherals-mouse"
+#define CURSOR_SIZE_KEY                  "cursor-size"
 
-#define POWER_SCHMES "org.ukui.power-manager"
-#define POWER_KEY "brightness-ac"
+#define POWER_SCHMES                     "org.ukui.power-manager"
+#define POWER_KEY                        "brightness-ac"
 
-#define ADVANCED_SCHEMAS "org.ukui.session.required-components"
-#define ADVANCED_KEY "windowmanager"
+#define ADVANCED_SCHEMAS                 "org.ukui.session.required-components"
+#define ADVANCED_KEY                     "windowmanager"
 
 Q_DECLARE_METATYPE(KScreen::OutputPtr)
 
@@ -78,6 +78,7 @@ Widget::Widget(QWidget *parent)
     gdk_init(NULL, NULL);
 
     ui->setupUi(this);
+    ui->monitorLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
     ui->quickWidget->setResizeMode(QQuickWidget::SizeRootObjectToView);
 
 #if QT_VERSION <= QT_VERSION_CHECK(5, 12, 0)
@@ -99,12 +100,16 @@ Widget::Widget(QWidget *parent)
 
 
     QHBoxLayout *nightLayout = new QHBoxLayout(ui->nightframe);
+
+    //~ contents_path /display/unify output
+    ui->unifyLabel->setText(tr("unify output"));
+
+    //~ contents_path /display/night mode
     nightLabel = new QLabel(tr("night mode"));
     nightButton = new SwitchButton;
     nightLayout->addWidget(nightLabel);
     nightLayout->addStretch();
     nightLayout->addWidget(nightButton);
-
 
     QProcess * process = new QProcess;
     process->start("lsb_release -r");
@@ -112,7 +117,9 @@ Widget::Widget(QWidget *parent)
 
     QByteArray ba = process->readAllStandardOutput();
     QString osReleaseCrude = QString(ba.data());
-    QString osRelease = QString(osReleaseCrude.split(":").at(1)).simplified();
+    QStringList res = osReleaseCrude.split(":");
+    QString osRelease = res.length() >= 2 ?  res.at(1) : "";
+    osRelease = osRelease.simplified();
 
     const QByteArray idd(ADVANCED_SCHEMAS);
     if (QGSettings::isSchemaInstalled(idd) && osRelease == "V10"){
@@ -124,9 +131,10 @@ Widget::Widget(QWidget *parent)
     }
 
     initTemptSlider();
-    initConfigFile();
+    initConfigFile(false, false);
     initUiComponent();
     initNightStatus();
+    initBrightnessUI();
 
 //    nightButton->setVisible(this->m_redshiftIsValid);
 
@@ -136,34 +144,22 @@ Widget::Widget(QWidget *parent)
     ui->nightframe->setVisible(this->m_redshiftIsValid);
 #endif
 
-
-//    qDebug()<<"set night mode here ---->"<<this->m_isNightMode<<endl;
     nightButton->setChecked(this->m_isNightMode);
     showNightWidget(nightButton->isChecked());
 
-//    connect(this,&Widget::nightModeChanged,nightButton,&SwitchButton::setChecked);
-//    connect(this,&Widget::redShiftValidChanged,nightButton,&SwitchButton::setVisible);
     connect(nightButton,SIGNAL(checkedChanged(bool)),this,SLOT(showNightWidget(bool)));
     connect(singleButton, SIGNAL(buttonClicked(int)), this, SLOT(showCustomWiget(int)));
-
     //是否禁用主显示器确认按钮
     connect(ui->primaryCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             this, &Widget::mainScreenButtonSelect);
-
     //主屏确认按钮
     connect(ui->mainScreenButton, SIGNAL(clicked()),
             this, SLOT(primaryButtonEnable()));
-
     mControlPanel = new ControlPanel(this);
-    connect(mControlPanel, &ControlPanel::changed,
-            this, &Widget::changed);
+    connect(mControlPanel, &ControlPanel::changed, this, &Widget::changed);
+    connect(mControlPanel, &ControlPanel::scaleChanged, this, &Widget::scaleChangedSlot);
 
-    connect(mControlPanel, &ControlPanel::scaleChanged,
-            this, &Widget::scaleChangedSlot);
-
-    //ui->formLayout_2->addWidget(mControlPanel);
     ui->controlPanelLayout->addWidget(mControlPanel);
-
 
 //    connect(ui->applyButton,SIGNAL(clicked()),this,SLOT(save()));
     // TODO: Find out why adjusting the screen orientation does not take effect
@@ -177,7 +173,6 @@ Widget::Widget(QWidget *parent)
            );
        }
     });
-//    connect(ui->applyButton,SIGNAL(clicked()),this,SLOT(saveBrigthnessConfig()));
 
     connect(ui->advancedBtn, &QPushButton::clicked, this, [=]{
         DisplayPerformanceDialog * dialog = new DisplayPerformanceDialog;
@@ -203,9 +198,6 @@ Widget::Widget(QWidget *parent)
 
     initGSettings();
     loadQml();
-    setBrigthnessFile();
-    //亮度调节UI
-//    initBrightnessUI();
 }
 
 Widget::~Widget()
@@ -354,7 +346,6 @@ void Widget::slotFocusedOutputChanged(QMLOutput *output)
     if (index == -1 || index == ui->primaryCombo->currentIndex()) {
         return;
     }
-    //qDebug()<<"下拉框id----->"<<index<<endl;
     ui->primaryCombo->setCurrentIndex(index);
 }
 
@@ -541,27 +532,11 @@ KScreen::OutputPtr Widget::findOutput(const KScreen::ConfigPtr &config, const QV
     return KScreen::OutputPtr();
 }
 
-//float Widget::scaleRet() {
-//    QString filepath = getenv("HOME");
-//    QString scale;
-//    filepath += "/.profile";
-//    QStringList res = this->readFile(filepath);
-//    QRegExp re("export( GDK_SCALE)?=(.*)$");
-//    for(int i = 0; i < res.length(); i++) {
-//        int pos = 0;
-////        qDebug()<<res.at(i)<<endl;
-//        QString str = res.at(i);
-//        while ((pos = re.indexIn(str, pos)) != -1) {
-//            scale = re.cap(2);
-//            pos += re.matchedLength();
-//        }
-//    }
-//    return scale.toFloat();
-//}
-
 void Widget::writeScale(int scale) {
     if (isScaleChanged) {
         KMessageBox::information(this,tr("Some applications need to be logouted to take effect"));
+    } else {
+        return;
     }
     isScaleChanged = false;
     int cursize;
@@ -604,59 +579,18 @@ void Widget::writeScale(int scale) {
 void Widget::initGSettings() {
     QByteArray id(UKUI_CONTORLCENTER_PANEL_SCHEMAS);
     if(QGSettings::isSchemaInstalled(id)) {
-//        qDebug()<<"initGSettings-------------------->"<<endl;
-        m_gsettings = new QGSettings(id)        ;
+        m_gsettings = new QGSettings(id, QByteArray(), this);
     } else {
-        return ;
+        qDebug() << Q_FUNC_INFO << "org.ukui.control-center.panel.plugins not install";
+        return;
     }
 
-//    QByteArray scaleId(SCRENN_SCALE_SCHMES);
-//    if(QGSettings::isSchemaInstalled(scaleId)) {
-////        qDebug()<<"initGSettings-------------------->"<<endl;
-//        scaleGSettings = new QGSettings(scaleId)        ;
-//    } else {
-//        qDebug()<<"org.ukui.session schemas not installed"<<endl;
-//        return ;
-//    }
-}
-
-bool Widget::getNightModeGSetting(const QString &key) {
-    if (!m_gsettings) {
-        return "";
-    }
-    const QStringList list = m_gsettings->keys();
-    if (!list.contains(key)) {
-        return "";
-    }
-    bool res = m_gsettings->get(key).toBool();
-    return res;
-}
-
-void Widget::setNightModebyPanel(bool judge) {
-//    QProcess *process = new QProcess;
-//    if(judge == true) {
-//        process->startDetached("redshift -t 5700:3600 -g 0.8 -m randr -v");
-//    }  else {
-//        QProcess::execute("killall redshift");
-//    }
-}
-
-void Widget::setSessionScale(int scale) {
-
-//    if (!scaleGSettings) {
-//        return;
-//    }
-//    QStringList keys = scaleGSettings->keys();
-//    if (keys.contains("hidpi")){
-//        scaleGSettings->set(USER_SACLE_KEY, true);
-//    }
-//    if (keys.contains("gdkScale")){
-
-//        scaleGSettings->set(GDK_SCALE_KEY, scale);
-//    }
-//    if (keys.contains("qtScaleFactor")) {
-//        scaleGSettings->set(QT_SCALE_KEY, scale);
-//    }
+    connect(m_gsettings, &QGSettings::changed, this, [=](QString key) {
+        if (static_cast<QString>(NIGHT_MODE_KEY) == key) {
+            bool status =  m_gsettings->get(key).toBool();
+            initConfigFile(true, status);
+        }
+    });
 }
 
 void Widget::writeConfigFile() {
@@ -692,7 +626,15 @@ void Widget::writeConfigFile() {
 
     m_qsettings->endGroup();
     m_qsettings->sync();
+}
 
+void Widget::setcomBoxScale() {
+    int scale = 1;
+    QComboBox *scaleCombox = findChild<QComboBox*>(QString("scaleCombox"));
+    if (scaleCombox) {
+        scale = ("100%" == scaleCombox->currentText() ? 1 : 2);
+    }
+    writeScale(scale);
 }
 
 void Widget::showNightWidget(bool judge) {
@@ -767,8 +709,7 @@ void Widget::outputRemoved(int outputId)
     ui->primaryCombo->removeItem(index);
 }
 
-void Widget::primaryOutputSelected(int index)
-{
+void Widget::primaryOutputSelected(int index) {
     //qDebug()<<"选中主显示器--->"<<index<<endl;
     if (!mConfig) {
         return;
@@ -784,8 +725,7 @@ void Widget::primaryOutputSelected(int index)
 }
 
 //主输出
-void Widget::primaryOutputChanged(const KScreen::OutputPtr &output)
-{
+void Widget::primaryOutputChanged(const KScreen::OutputPtr &output) {
     Q_ASSERT(mConfig);
     int index = output.isNull() ? 0 : ui->primaryCombo->findData(output->id());
     if (index == -1 || index == ui->primaryCombo->currentIndex()) {
@@ -884,21 +824,19 @@ void Widget::save()
     bool atLeastOneEnabledOutput = false;
     int i = 0;
     int connectedScreen = 0;
+    int outputCount = 0;
     Q_FOREACH(const KScreen::OutputPtr &output, config->outputs()) {
         KScreen::ModePtr mode = output->currentMode();
         if (output->isEnabled()) {
-//            qDebug()<<"atLeastOneEnabledOutput------------>"<<endl;
             atLeastOneEnabledOutput = true;
             connectedScreen++;
         }
         if (!output->isConnected())
             continue;
+        outputCount++;
 
         QMLOutput *base = mScreen->primaryOutput();
-//        qDebug()<<"primaryOutput---->"<<base<<endl;
-
         if (!base) {
-
             for (QMLOutput *output: mScreen->outputs()) {
                 if (output->output()->isConnected() && output->output()->isEnabled()) {
                     base = output;
@@ -911,14 +849,14 @@ void Widget::save()
                 return;
             }
         }
-//        qDebug()<<" clone mode--------->"<<endl;
-        inputXml[i].isClone = base->isCloneMode() == true?"true":"false";
+        inputXml[i].isClone = base->isCloneMode() == true? "yes" : "no";
         inputXml[i].outputName = output->name();
 
         inputXml[i].widthValue = QString::number(mode->size().width());
         inputXml[i].heightValue = QString::number(mode->size().height());
         inputXml[i].rateValue = QString::number(mode->refreshRate());
-        inputXml[i].posxValue = QString::number(output->pos().x());
+
+        inputXml[i].posxValue = (outputCount == 2 && connectedScreen == 1) ? "0" : QString::number(output->pos().x());
         inputXml[i].posyValue = QString::number(output->pos().y());
         inputXml[i].vendorName = output->edid()->pnpId();
 
@@ -942,7 +880,6 @@ void Widget::save()
     }
 
     if (!atLeastOneEnabledOutput ) {
-        qDebug()<<"atLeastOneEnabledOutput---->"<<connectedScreen<<endl;
         KMessageBox::error(this,tr("please insure at least one output!"),
                            tr("Warning"),KMessageBox::Notify);
         closeScreenButton->setChecked(true);
@@ -960,10 +897,11 @@ void Widget::save()
 //    int scale = static_cast<int>(this->scaleRet());
     initScreenXml(countOutput);
     writeScreenXml(countOutput);
-#if QT_VERSION < QT_VERSION_CHECK(5, 7, 0)
-#else
-    writeScale(static_cast<float>(this->screenScale));
-#endif
+//#if QT_VERSION < QT_VERSION_CHECK(5, 7, 0)
+//    setcomBoxScale();
+//#else
+    writeScale(this->screenScale);
+//#endif
     writeConfigFile();
     setNightMode(nightButton->isChecked());
 
@@ -974,11 +912,6 @@ void Widget::save()
                  tr("@title:window", "Unsupported Configuration"));
         return;
     }
-//    qDebug()<<"scale ann screenScale is -------->"<<this->scaleRet()<<" "<<this->screenScale<<endl;
-
-//    if (scale != this->screenScale) {
-//        KMessageBox::information(this,tr("Some applications need to be restarted to take effect"));
-//    }
 
     m_blockChanges = true;
     /* Store the current config, apply settings */
@@ -998,7 +931,6 @@ void Widget::save()
 }
 
 void Widget::scaleChangedSlot(int index) {
-    qDebug()<<"scale changed----------->"<<index<<endl;
     switch (index) {
     case 0:
         this->screenScale = 1;
@@ -1105,59 +1037,6 @@ QString Widget::getScreenName(QString screenname){
     return screenname.mid(startPos+1,endPos-startPos-1);
 }
 
-QStringList Widget::getscreenBrightnesName(){
-    QByteArray ba;
-    FILE * fp = NULL;
-    char cmd[1024];
-    char buf[1024];
-
-    sprintf(cmd, "xrandr | grep \" connected\"  | awk '{ print$1 }'");
-    if ((fp = popen(cmd, "r")) != NULL){
-        rewind(fp);
-        while(!feof(fp)){
-            fgets(buf, sizeof (buf), fp);
-            ba.append(buf);
-        }
-        pclose(fp);
-        fp = NULL;
-
-    }else{
-        qDebug()<<"popen文件打开失败"<<endl;
-    }
-    QString str =  QString(ba);
-//    qDebug()<<"strlist------>"<<str<<endl;
-    QStringList strlist = str.split("\n");
-    return strlist;
-}
-
-
-QStringList Widget::getscreenBrightnesValue(){
-    QByteArray ba;
-    FILE * fp = NULL;
-    char cmd[1024];
-    char buf[1024];
-//    const char * cmdstr = ;
-
-    sprintf(cmd, "xrandr --verbose | grep Brightness |cut -f2 -d :");
-    if ((fp = popen(cmd, "r")) != NULL){
-        rewind(fp);
-        while(!feof(fp)){
-            fgets(buf, sizeof (buf), fp);
-            ba.append(buf);
-        }
-        pclose(fp);
-        fp = NULL;
-    }else{
-        qDebug()<<"popen文件打开失败"<<endl;
-    }
-    QString str =  QString(ba);
-//    qDebug()<<"strlist  value------>"<<str<<endl;
-    str = str.mid(1,str.length())+" ";
-    QStringList strlist = str.split("\n ");
-    return strlist;
-}
-
-
 void Widget::setBrightnessScreen(int index){
     QGSettings *powerSettings;
     if (QGSettings::isSchemaInstalled(POWER_SCHMES)) {
@@ -1171,100 +1050,11 @@ void Widget::setBrightnessScreen(int index){
     if (!powerSettings) {
         delete powerSettings;
     }
-//    QStringList nameList = getscreenBrightnesName();
-//    QString sliderValue = QString::number(ui->brightnessSlider->value()/100.0);
-
-//    QString screenName =  getScreenName();
-
-//    float value = index/100.0 >0.2?index/100.0:0.2;
-//    QString brightnessValue = QString::number(value);
-
-//    QProcess *process = new QProcess;
-//    QMLOutput *base = mScreen->primaryOutput();
-//    //qDebug()<<"primaryOutput---->"<<base<<endl;
-//    if (!base) {
-
-//        for (QMLOutput *output: mScreen->outputs()) {
-//            if (output->output()->isConnected() && output->output()->isEnabled()) {
-//                base = output;
-//                break;
-//            }
-//        }
-
-//        if (!base) {
-//            // WTF?
-//            return;
-//        }
-//    }
-//    if(base->isCloneMode() == false) {
-//        process->start("xrandr",QStringList()<<"--output"<<screenName<<"--brightness"<< brightnessValue);
-//        process->waitForFinished();
-//        const QString &cmd = "xrandr --output "+ screenName+" --brightness "+ brightnessValue;
-//    } else {
-//        for(int i = 0; i < nameList.length(); i++ ){
-//            if(nameList.at(i) != ""){
-//                process->start("xrandr",QStringList()<<"--output"<<nameList.at(i)<<"--brightness"<< sliderValue);
-//                process->waitForFinished();
-//            }
-//        }
-//    }
-}
-
-
-//保存屏幕亮度配置
-void Widget::saveBrigthnessConfig(){
-
-    QStringList cmdList;
-    QStringList nameList = getscreenBrightnesName();
-    QStringList valueList = getscreenBrightnesValue();
-    QString sliderValue = QString::number(ui->brightnessSlider->value()/100.0);
-    int len = std::min(nameList.length(),valueList.length());
-
-//    qDebug()<<"QStringList------------------>"<<nameList<<" "<<valueList<<endl;
-    for(int i = 0;i < len;i++){
-        //qDebug()<<"亮度值---》"<<valueList.at(i)<<endl;
-        if("" == nameList.at(i) || "" == valueList.at(i)){
-            continue;
-        }
-        //非统一输出模式
-        QString tmpcmd = nullptr;
-        if(inputXml->isClone == "false"){
-            tmpcmd = "xrandr --output "+ nameList.at(i)+" --brightness "+ valueList.at(i);
-        } else {
-            tmpcmd = "xrandr --output "+ nameList.at(i)+" --brightness "+ sliderValue;
-        }
-
-        cmdList.append(tmpcmd);
-    }
-
-    QFile fp(brightnessFile);
-    if(!fp.open(QIODevice::WriteOnly)){
-        qDebug()<<"写入文件失败"<<endl;
-        return ;
-    }
-    QTextStream cmdOuput(&fp);
-    for(int i=0;i<cmdList.length();i++){
-        cmdOuput<<cmdList.at(i)<<endl;
-    }
-    fp.close();
 }
 
 //滑块改变
 void Widget::setBrightnesSldierValue(QString name){
-//   // qDebug()<<"setBrightnesSldierValue---->"<<endl;
-//    QString screename = getScreenName(name);
-//    QStringList nameList = getscreenBrightnesName();
-//    QStringList valueList = getscreenBrightnesValue();
-////    qDebug()<<"nameList and valueList is--------->"<<nameList<<" \n"<<valueList<<endl;
-//    int len = std::min(nameList.length(),valueList.length()) -1;
-//    QMap<QString,float> brightnessMap;
-
-//    for(int i = 0;i < len;i++){
-//        brightnessMap.insert(nameList.at(i).trimmed(),valueList.at(i).toFloat());
-//    }
-
-//    ui->brightnessSlider->setValue(brightnessMap[screename]*100);
-
+    Q_UNUSED(name)
     QGSettings *powerSettings;
     int value = 99;
     if (QGSettings::isSchemaInstalled(POWER_SCHMES)) {
@@ -1279,12 +1069,6 @@ void Widget::setBrightnesSldierValue(QString name){
         delete powerSettings;
     }
     ui->brightnessSlider->setValue(value);
-}
-
-//亮度配置文件位置
-void Widget::setBrigthnessFile(){
-    brightnessFile = getenv("HOME");
-    brightnessFile += "/.xprofile";
 }
 
 void Widget::initTemptSlider() {
@@ -1302,7 +1086,7 @@ void Widget::initTemptSlider() {
     }
 }
 
-void Widget::initConfigFile() {
+void Widget::initConfigFile(bool changed, bool status) {
     QString filename = QDir::homePath() + "/.config/redshift.conf";
     m_qsettings = new QSettings(filename, QSettings::IniFormat);
 
@@ -1312,11 +1096,9 @@ void Widget::initConfigFile() {
     QString cltime = m_qsettings->value("dawn-time", "").toString();
     QString temptValue = m_qsettings->value("temp-night", "").toString();
 
-    if ("" != optime){
+    if ("" != optime) {
         QString ophour = optime.split(":").at(0);
         QString opmin = optime.split(":").at(1);
-
-//        qDebug()<<"optime is----->"<<ophour.toInt()<<" "<<opmin.toInt()<<endl;
 
         ui->opHourCom->setCurrentIndex(ophour.toInt());
         ui->opMinCom->setCurrentIndex(opmin.toInt());
@@ -1358,6 +1140,10 @@ void Widget::initConfigFile() {
     }
 
     m_qsettings->endGroup();
+
+    if (changed) {
+        nightButton->setChecked(status);
+    }
 }
 
 void Widget::writeScreenXml(int count){
@@ -1588,8 +1374,6 @@ void Widget::initScreenXml(int count){
     xmlWriter.writeEndElement();
 }
 
-
-
 void Widget::getEdidInfo(QString monitorName,xmlFile *xml) {
     int i;
     int modelDec;
@@ -1699,49 +1483,10 @@ void Widget::setIsNightMode(bool isNightMode) {
    // emit nightModeChanged(isNightMode);
 }
 
-QStringList Widget::readFile(const QString& filepath) {
-    QStringList fileCont;
-    QFile file(filepath);
-    if(file.exists()) {
-        if(!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qWarning() << "ReadFile() failed to open" << filepath;
-            return QStringList();
-        }
-        QTextStream textStream(&file);
-        while(!textStream.atEnd()) {
-            QString line= textStream.readLine();
-            line.remove('\n');
-            fileCont<<line;
-        }
-        file.close();
-        return fileCont;
-    } else {
-        qWarning() << filepath << " not found"<<endl;
-        return QStringList();
-    }
-}
-
-void Widget::writeFile(const QString &filepath, const QStringList &content) {
-//    qDebug()<<"witeFile--------->"<<endl;
-    QFile file(filepath);
-
-    if(!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            qWarning() << "writeFile() failed to open" << filepath;
-    }
-    QTextStream textStream(&file);
-    for(int i = 0; i < content.length(); i++) {
-
-        textStream<<content.at(i);
-        textStream<<"\n";
-    }
-    file.close();
-}
-
 void Widget::initUiComponent() {
     singleButton = new QButtonGroup();
     singleButton->addButton(ui->sunradioBtn);
     singleButton->addButton(ui->customradioBtn);
-
 
     singleButton->setId(ui->sunradioBtn, SUN);
     singleButton->setId(ui->customradioBtn, CUSTOM);
@@ -1765,7 +1510,7 @@ void Widget::initUiComponent() {
 
     QDBusReply<QVariant> briginfo;
     briginfo  = brightnessInterface ->call("Get", "org.freedesktop.UPower.Device", "PowerSupply");
-    if (!briginfo.isValid()) {
+    if (!briginfo.value().toBool()) {
         qDebug()<<"brightness info is invalid"<<endl;
         ui->brightnessframe->setVisible(false);
     } else {
@@ -1774,22 +1519,18 @@ void Widget::initUiComponent() {
     }
 }
 
-void Widget::setRedShiftIsValid(bool redshiftIsValid){
+void Widget::setRedShiftIsValid(bool redshiftIsValid) {
     if(m_redshiftIsValid == redshiftIsValid) {
         return ;
     }
 
     m_redshiftIsValid = redshiftIsValid;
-
     emit redShiftValidChanged(redshiftIsValid);
 }
 
-void Widget::initNightStatus(){
-
+void Widget::initNightStatus() {
     QProcess *process = new QProcess;
     const bool isRedShiftValid  = (0 == process->execute("which",QStringList() << "redshift"));
-//    qDebug()<<"isRedshitValid-------------->"<<isRedShiftValid<<endl;
-
 
     QProcess *process_2 = new QProcess;
     process_2->start("systemctl", QStringList() << "--user" << "is-active" << "redshift.service");
@@ -1799,8 +1540,6 @@ void Widget::initNightStatus(){
 
     QString tmpNight = qbaOutput;
     m_isNightMode = (tmpNight=="active\n" ? true : false);
-//    qDebug()<<"m_isNightMode is------------->"<<tmpNight<<endl;
-
 
     if (isRedShiftValid){
         updateNightStatus();

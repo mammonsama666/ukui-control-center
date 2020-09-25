@@ -28,7 +28,6 @@
 
 DisplaySet::DisplaySet(){
     pluginWidget = new Widget;
-//    pluginWidget->setStyleSheet("background: #ffffff;");
     pluginName = tr("Display");
     QObject::connect(new KScreen::GetConfigOperation(), &KScreen::GetConfigOperation::finished,
                      [&](KScreen::ConfigOperation *op) {
@@ -57,5 +56,10 @@ int DisplaySet::get_plugin_type(){
 
 void DisplaySet::plugin_delay_control(){
 
+}
+
+const QString DisplaySet::name() const {
+
+    return QStringLiteral("display");
 }
 

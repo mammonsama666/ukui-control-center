@@ -21,12 +21,8 @@
 
 #include "ComboBox/combobox.h"
 
-#define FONT_RENDERING_DPI "org.ukui.font-rendering"
-#define DPI_KEY "dpi"
-
-//#define SCRENN_SCALE_SCHMES "org.ukui.session"
-//#define GDK_SCALE_KEY "gdk-scale"
-
+#define SCALE_SCHEMAS "org.ukui.SettingsDaemon.plugins.xsettings"
+#define SCALE_KEY "scaling-factor"
 
 OutputConfig::OutputConfig(QWidget *parent)
     : QWidget(parent)
@@ -119,24 +115,19 @@ void OutputConfig::initUi()
 
 
     QLabel *resLabel = new QLabel(this);
+    //~ contents_path /display/resolution
     resLabel->setText(tr("resolution"));
-//    resLabel->setFont(ft);
     resLabel->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     resLabel->setMinimumSize(118,30);
     resLabel->setMaximumSize(118,30);
 
     QHBoxLayout *resLayout = new QHBoxLayout();
-    //resLayout->setContentsMargins(0,5,0,5);
     resLayout->addWidget(resLabel);
     resLayout->addWidget(mResolution);
-//    resLayout->addStretch();
-
 
     QFrame *resFrame = new QFrame(this);
     resFrame->setFrameShape(QFrame::Shape::Box);
     resFrame->setLayout(resLayout);
-//    resWidget->setStyleSheet("background-color:#F4F4F4;border-radius:6px");
-//    mResolution->setStyleSheet("background-color:#F8F9F9");
 
     resFrame->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     resFrame->setMinimumSize(552,50);
@@ -149,16 +140,12 @@ void OutputConfig::initUi()
 
     //方向下拉框
     mRotation = new QComboBox();
-
-//    mRotation->setFont(ft);
     mRotation->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     mRotation->setMinimumSize(402,30);
     mRotation->setMaximumSize(16777215,30);
-//    mRotation->setStyleSheet(qss);
-//    mRotation->setItemDelegate(itemDelege);
-
 
     QLabel *rotateLabel = new QLabel();
+    // ~contents_path /display/orientation
     rotateLabel->setText(tr("orientation"));
 //    rotateLabel->setFont(ft);
     rotateLabel->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
@@ -168,15 +155,12 @@ void OutputConfig::initUi()
     QHBoxLayout *rotateLayout = new QHBoxLayout();
     rotateLayout->addWidget(rotateLabel);
 
-
     rotateLayout->addWidget(mRotation);
 //    rotateLayout->addStretch();
 
     QFrame *rotateFrame = new QFrame(this);
     rotateFrame->setFrameShape(QFrame::Shape::Box);
     rotateFrame->setLayout(rotateLayout);
-//    rotateWidget->setStyleSheet("background-color:#F4F4F4;border-radius:6px");
-//    mRotation->setStyleSheet("background-color:#F8F9F9");
 
     rotateFrame->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     rotateFrame->setMinimumSize(550,50);
@@ -208,17 +192,12 @@ void OutputConfig::initUi()
 
     //刷新率下拉框
     mRefreshRate = new QComboBox();
-//    mRefreshRate->setFont(ft);
-//    mRefreshRate->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     mRefreshRate->setMinimumSize(402,30);
     mRefreshRate->setMaximumSize(16777215,30);
-//    mRefreshRate->setStyleSheet(qss);
-//    mRefreshRate->setItemDelegate(itemDelege);
-//    mRefreshRate->setMaxVisibleItems(5);
 
     QLabel *freshLabel = new QLabel();
+    // ~contents_path /display/refresh rate
     freshLabel->setText(tr("refresh rate"));
-//    freshLabel->setFont(ft);
     freshLabel->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     freshLabel->setMinimumSize(118,30);
     freshLabel->setMaximumSize(118,30);
@@ -226,12 +205,10 @@ void OutputConfig::initUi()
     QHBoxLayout *freshLayout = new QHBoxLayout();
     freshLayout->addWidget(freshLabel);
     freshLayout->addWidget(mRefreshRate);
-//    freshLayout->addStretch();
 
     QFrame *freshFrame = new QFrame(this);
     freshFrame->setFrameShape(QFrame::Shape::Box);
     freshFrame->setLayout(freshLayout);
-//    freshWidget->setStyleSheet("background-color:#F4F4F4;border-radius:6px");
 
     freshFrame->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     freshFrame->setMinimumSize(550,50);
@@ -245,23 +222,20 @@ void OutputConfig::initUi()
             this, &OutputConfig::slotRefreshRateChanged);
 
 
-
     scaleCombox = new QComboBox();
-//    mRefreshRate->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
+    scaleCombox->setObjectName("scaleCombox");
     scaleCombox->setMinimumSize(402,30);
     scaleCombox->setMaximumSize(16777215,30);
 
-
-
     int maxReslu = mResolution->getMaxResolution().width();
 
-#if QT_VERSION < QT_VERSION_CHECK(5,7,0)
-    if (maxReslu >= 2000) {
-        scaleCombox->addItem(tr("200%"));
-    } else {
-        scaleCombox->addItem(tr("100%"));
-    }
-#else
+//#if QT_VERSION < QT_VERSION_CHECK(5,7,0)
+//    if (maxReslu >= 2000) {
+//        scaleCombox->addItem(tr("200%"));
+//    } else {
+//        scaleCombox->addItem(tr("100%"));
+//    }
+//#else
     scaleCombox->addItem(tr("100%"));
     if (maxReslu >= 2000 && maxReslu <= 3800) {
         scaleCombox->addItem(tr("200%"));
@@ -269,9 +243,11 @@ void OutputConfig::initUi()
         scaleCombox->addItem(tr("200%"));
         scaleCombox->addItem(tr("300%"));
     }
-#endif
+//#endif
 
     QLabel *scaleLabel = new QLabel();
+
+    //~ contents_path /display/screen zoom
     scaleLabel->setText(tr("screen zoom"));
     scaleLabel->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     scaleLabel->setMinimumSize(118,30);
@@ -285,7 +261,6 @@ void OutputConfig::initUi()
     QFrame *scaleFrame = new QFrame(this);
     scaleFrame->setFrameShape(QFrame::Shape::Box);
     scaleFrame->setLayout(scaleLayout);
-//    scaleWidget->setStyleSheet("background-color:#F4F4F4;border-radius:6px");
 
     scaleFrame->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
     scaleFrame->setMinimumSize(550,50);
@@ -293,40 +268,29 @@ void OutputConfig::initUi()
     vbox->addWidget(scaleFrame);
 
     int scale = getScreenScale();
-#if QT_VERSION < QT_VERSION_CHECK(5,7,0)
+//#if QT_VERSION < QT_VERSION_CHECK(5,7,0)
 
-#else
+//#else
     scaleCombox->setCurrentIndex(0);
     if (scale <= scaleCombox->count() && scale > 0) {
 //        qDebug()<<"scale is----->"<<scale<<endl;
         scaleCombox->setCurrentIndex(scale - 1);
     }
     slotScaleChanged(scale - 1);
-#endif
+//#endif
 
     connect(scaleCombox, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated),
             this, &OutputConfig::slotScaleChanged);
 }
 
-int OutputConfig::getMaxReslotion() {
-
-}
-
 int OutputConfig::getScreenScale() {
     QGSettings * dpiSettings;
-    QByteArray id(FONT_RENDERING_DPI);
-    int scale = 0;
-    if (QGSettings::isSchemaInstalled(FONT_RENDERING_DPI)) {
+    QByteArray id(SCALE_SCHEMAS);
+    int scale = 1;
+    if (QGSettings::isSchemaInstalled(SCALE_SCHEMAS)) {
         dpiSettings = new QGSettings(id);
-        scale = dpiSettings->get(DPI_KEY).toInt();
-        if (96 == scale)  {
-            scale = 1;
-        } else if (192 == scale) {
-            scale = 2;
-        } else if (288 == scale) {
-            scale = 3;
-        } else {
-            scale = 1;
+        if (dpiSettings->keys().contains("scalingFactor")) {
+            scale = dpiSettings->get(SCALE_KEY).toInt();
         }
     }
     return scale;
@@ -367,8 +331,8 @@ void OutputConfig::slotResolutionChanged(const QSize &size)
 
     // Don't remove the first "Auto" item - prevents ugly flicker of the combobox
     // when changing resolution
-    for (int i = 1; i < mRefreshRate->count(); ++i) {
-        mRefreshRate->removeItem(i);
+    for (int i = mRefreshRate->count(); i >=2; --i) {
+        mRefreshRate->removeItem(i - 1);
     }
 
     for (int i = 0, total = modes.count(); i < total; ++i) {
@@ -377,7 +341,7 @@ void OutputConfig::slotResolutionChanged(const QSize &size)
         // If selected refresh rate is other then what we consider the "Auto" value
         // - that is it's not the highest resolution - then select it, otherwise
         // we stick with "Auto"
-        if (mode == selectedMode && i > 1) {
+        if (mode == selectedMode && mRefreshRate->count() > 1) {
             // i + 1 since 0 is auto
             mRefreshRate->setCurrentIndex(i + 1);
         }
@@ -406,6 +370,7 @@ void OutputConfig::slotRefreshRateChanged(int index)
     } else {
         modeId = mRefreshRate->itemData(index).toString();
     }
+    qDebug()  << "modeId is:" << modeId << endl;
     mOutput->setCurrentModeId(modeId);
 
     Q_EMIT changed();
@@ -457,22 +422,3 @@ QStringList OutputConfig::readFile(const QString& filepath) {
     }
 }
 
-int OutputConfig::scaleRet() {
-    QGSettings * dpiSettings;
-    QByteArray id(FONT_RENDERING_DPI);
-    int scale = 0;
-    if (QGSettings::isSchemaInstalled(FONT_RENDERING_DPI)) {
-        dpiSettings = new QGSettings(id);
-        scale = dpiSettings->get(DPI_KEY).toInt();
-        if (96 == scale)  {
-            scale = 1;
-        } else if (192 == scale) {
-            scale = 2;
-        } else if (288 == scale) {
-            scale = 3;
-        } else {
-            scale = 1;
-        }
-    }
-    return scale;
-}
