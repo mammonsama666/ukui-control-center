@@ -167,6 +167,19 @@ void Fonts::plugin_delay_control(){
 
 }
 
+const QString Fonts::name() const {
+
+    return QStringLiteral("fonts");
+}
+void Fonts::initSearchText() {
+
+    //~ contents_path /fonts/Font size
+    ui->fontSizeLabel->setText(tr("Font size"));
+    //~ contents_path /fonts/Fonts select
+    ui->fontSizeLabel->setText(tr("Fonts select"));
+    //~ contents_path /fonts/Font size
+    ui->fontSizeLabel->setText(tr("Font size"));
+}
 void Fonts::setupStylesheet(){
 
 

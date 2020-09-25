@@ -20,7 +20,6 @@
 #ifndef FONTS_H
 #define FONTS_H
 
-
 #include <QObject>
 #include <QtPlugin>
 #include <QPushButton>
@@ -64,8 +63,10 @@ public:
     int get_plugin_type() Q_DECL_OVERRIDE;
     QWidget * get_plugin_ui() Q_DECL_OVERRIDE;
     void plugin_delay_control() Q_DECL_OVERRIDE;
+    const QString name() const  Q_DECL_OVERRIDE;
 
 public:
+    void initSearchText();
     void setupStylesheet();
     void setupComponent();
     void setupConnect();
@@ -111,7 +112,6 @@ private:
     bool settingsCreate;
     QGSettings * stylesettings;
     Uslider * uslider;
-
 };
 
 #endif // FONTS_H
