@@ -29,7 +29,9 @@
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QDir>
+#include <QDebug>
 
+#define ITEMHEIGH 50
 
 #define CONTROL_CENTER_WIFI "org.ukui.control-center.wifi.switch"
 NetConnect::NetConnect():m_wifiList(new Wifi)
@@ -39,7 +41,7 @@ NetConnect::NetConnect():m_wifiList(new Wifi)
     pluginWidget->setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(pluginWidget);
 
-    pluginName = tr("Netconnect");
+    pluginName = tr("Connect");
     pluginType = NETWORK;
 
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
@@ -47,10 +49,11 @@ NetConnect::NetConnect():m_wifiList(new Wifi)
 
     ui->detailBtn->setText(tr("Network settings"));
 
-    wifiBtn = new SwitchButton();
+    wifiBtn = new SwitchButton(pluginWidget);
 
     ui->openWIifLayout->addWidget(wifiBtn);
 
+    initSearchText();
     initComponent();
 
 //    getNetList();
@@ -82,7 +85,58 @@ void NetConnect::plugin_delay_control(){
 
 }
 
+void NetConnect::refreshed_signal_changed() {
+    //qDebug() << "is_refreshed: "<<this->is_refreshed;
+    //仅接收属性更改发出的第一个信号并更改is_refreshed状态
+    if(is_refreshed){
+        emit refresh();
+        this->is_refreshed = false;
+    }
+    else return;
+    //qDebug() << "is_refreshed: "<<this->is_refreshed;
+}
+
+//把判断列表是否已刷新的bool值is_refreshed重置为true
+void NetConnect::reset_bool_is_refreshed(){
+    this->is_refreshed = true;
+}
+
+void NetConnect::properties_changed_refresh(){
+    getNetList();
+    /*等待一段时间后把is_refreshed重置，等待是为了避免在dbus接收属性更改时收到
+    多条信号并连续执行槽函数refreshed_signal_changed()并更改is_refreshed导致冲突*/
+    QTimer::singleShot(1000, this, SLOT(reset_bool_is_refreshed()));
+}
+const QString NetConnect::name() const {
+
+    return QStringLiteral("netconnect");
+}
+
+void NetConnect::initSearchText() {
+    //~ contents_path /netconnect/Netconnect Status
+    ui->titleLabel->setText(tr("Netconnect Status"));
+    //~ contents_path /netconnect/open wifi
+    ui->openLabel->setText(tr("open wifi"));
+}
+
 void NetConnect::initComponent(){
+
+//    ui->RefreshBtn->hide();
+
+    //把判断列表是否已刷新的bool值初始化为true
+    this->is_refreshed = true;
+
+    //接收到系统创建网络连接的信号时刷新可用网络列表
+    QDBusConnection::systemBus().connect(QString(), QString("/org/freedesktop/NetworkManager/Settings"), "org.freedesktop.NetworkManager.Settings", "NewConnection", this, SLOT(getNetList(void)));
+    //接收到系统删除网络连接的信号时刷新可用网络列表
+    QDBusConnection::systemBus().connect(QString(), QString("/org/freedesktop/NetworkManager/Settings"), "org.freedesktop.NetworkManager.Settings", "ConnectionRemoved", this, SLOT(getNetList(void)));
+    //接收到系统更改网络连接属性的信号时刷新可用网络列表
+//    QDBusConnection::systemBus().connect(QString(), QString("/org/freedesktop/NetworkManager"), "org.freedesktop.NetworkManager", "PropertiesChanged", this, SLOT(getNetList(void)));
+    //接收到系统更改网络连接属性时把判断是否已刷新的bool值置为false
+    QDBusConnection::systemBus().connect(QString(), QString("/org/freedesktop/NetworkManager"), "org.freedesktop.NetworkManager", "PropertiesChanged", this, SLOT(refreshed_signal_changed(void)));
+
+    //接收到刷新信号refresh()时执行刷新(仅适用与网络属性或当前连接的网络更改)
+    connect(this, SIGNAL(refresh()), this, SLOT(properties_changed_refresh()));
 
     const QByteArray id(CONTROL_CENTER_WIFI);
     if(QGSettings::isSchemaInstalled(id)) {
@@ -107,9 +161,10 @@ void NetConnect::initComponent(){
 
     connect(ui->RefreshBtn, &QPushButton::clicked, this, [=](bool checked){
         Q_UNUSED(checked)
-        clearContent();
-        ui->waitLabel->setVisible(true);
-        ui->statuswaitLabel->setVisible(true);
+//        clearContent();
+//        ui->waitLabel->setVisible(true);
+//        ui->statuswaitLabel->setVisible(true);
+        ui->RefreshBtn->setText(tr("Refreshing..."));
         ui->RefreshBtn->setEnabled(false);
         wifiBtn->setEnabled(false);
         QTimer::singleShot(1*1000,this,SLOT(getNetList()));
@@ -119,9 +174,10 @@ void NetConnect::initComponent(){
         wifiBtn->setChecked(getInitStatus());
     }
     connect(wifiBtn, &SwitchButton::checkedChanged, this,[=](bool checked){
-        clearContent();
-        ui->waitLabel->setVisible(true);
-        ui->statuswaitLabel->setVisible(true);
+//        clearContent();
+//        ui->waitLabel->setVisible(true);
+//        ui->statuswaitLabel->setVisible(true);
+        ui->RefreshBtn->setText(tr("Refreshing..."));
         ui->RefreshBtn->setEnabled(false);
         wifiBtn->setEnabled(false);
 
@@ -134,6 +190,7 @@ void NetConnect::initComponent(){
     wifiBtn->setEnabled(false);
 
     emit ui->RefreshBtn->clicked(true);
+    ui->verticalLayout_2->setContentsMargins(0,0,32,0);
 }
 
 void NetConnect::rebuildNetStatusComponent(QString iconPath, QString netName){
@@ -205,6 +262,7 @@ void NetConnect::rebuildNetStatusComponent(QString iconPath, QString netName){
 }
 
 void NetConnect::getNetList() {
+//    qDebug() << "getNetList start" <<endl;
 
     bool wifiSt = getwifiisEnable();
     if (!wifiSt) {
@@ -246,12 +304,15 @@ void NetConnect::getNetList() {
         bool wifiSt = getwifiisEnable();
         wifiBtn->setEnabled(wifiSt);
         ui->RefreshBtn->setEnabled(true);
+        ui->RefreshBtn->setText(tr("Refresh"));
 
-        ui->waitLabel->setVisible(false);
-        ui->statuswaitLabel->setVisible(false);
+//        ui->waitLabel->setVisible(false);
+//        ui->statuswaitLabel->setVisible(false);
     });
     connect(pThread, &QThread::finished, pNetWorker, &NetconnectWork::deleteLater);
     pThread->start();
+
+//    qDebug() << "getNetList end" <<endl;
 }
 
 void NetConnect::rebuildAvailComponent(QString iconPath, QString netName){

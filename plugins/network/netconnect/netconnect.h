@@ -30,7 +30,13 @@
 
 #include <QTimer>
 #include <QStringList>
+#include <QString>
 #include <QGSettings>
+
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <HoverWidget/hoverwidget.h>
+#include <QMap>
 
 #include "wifi.h"
 #include "netconnectwork.h"
@@ -74,8 +80,10 @@ public:
     int get_plugin_type() Q_DECL_OVERRIDE;
     QWidget * get_plugin_ui() Q_DECL_OVERRIDE;
     void plugin_delay_control() Q_DECL_OVERRIDE;
+    const QString name() const  Q_DECL_OVERRIDE;
 
 public:
+    void initSearchText();
     void initComponent();    
     void rebuildNetStatusComponent(QString iconPath, QString netName);
     void rebuildAvailComponent(QString iconpath, QString netName);
@@ -83,6 +91,8 @@ public:
     void runExternalApp();
 
     bool getwifiisEnable();
+
+    bool is_refreshed;
 
 private:
     Ui::NetConnect *ui;
@@ -109,6 +119,9 @@ private:
     QString actLanName;
 
 private:
+
+    QMap<QString, QListWidgetItem *> AvailableNetworkMap;
+
     int setSignal(QString lv);      //get wifi's strength
     QStringList execGetLanList();
     void getWifiListDone(QStringList wifislist, QStringList lanList);
@@ -122,9 +135,21 @@ private:
     // clear the lan and wifi list
     void clearContent();
 
+    void deleteNetworkDone(QString);
+    void addNetworkDone(QString);
+    void _buildWidgetForItem(QString);
+    void initNetworkMap();
+
 private slots:
     void wifiSwitchSlot(bool signal);
     void getNetList();
+
+    void refreshed_signal_changed();
+    void properties_changed_refresh();
+    void reset_bool_is_refreshed();
+
+signals:
+    void refresh();
 };
 
 #endif // NETCONNECT_H
