@@ -60,31 +60,15 @@ AutoBoot::AutoBoot(){
     pluginWidget->setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(pluginWidget);
 
-    pluginName = tr("Autoboot");
+    pluginName = tr("Auto Boot");
     pluginType = SYSTEM;
 
 //    ui->addFrame->installEventFilter(this);
     ui->titleLabel->setStyleSheet("QLabel{font-size: 18px; color: palette(windowText);}");
 
+    //~ contents_path /autoboot/Autoboot Settings
+    ui->titleLabel->setText(tr("Autoboot Settings"));
 
-
-//    pluginWidget->setStyleSheet("background: #ffffff;");
-//    ui->addWidget->setStyleSheet("QWidget{background: #F4F4F4; border-radius: 6px;}");
-
-//    ui->listWidget->setStyleSheet("QListWidget#listWidget{background: #ffffff; border: none;}"
-//                                  "");
-
-//    ui->addBtn->setIcon(QIcon("://img/plugins/autoboot/add.png"));
-//    ui->addBtn->setIconSize(QSize(48, 48));
-//    ui->addBtn->setStyleSheet("QPushButton{background-color:transparent;}");
-
-
-
-//    ui->listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-//    ui->listWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
-
-//    ui->listWidget->setSpacing(0);
 
     localconfigdir = g_build_filename(g_get_user_config_dir(), "autostart", NULL);
     //初始化添加界面
@@ -117,6 +101,10 @@ QWidget *AutoBoot::get_plugin_ui(){
 
 void AutoBoot::plugin_delay_control(){
 
+}
+
+const QString AutoBoot::name() const {
+    return QStringLiteral("autoboot");
 }
 
 void AutoBoot::initAddBtn() {
@@ -280,8 +268,8 @@ void AutoBoot::initUI(){
         appgroupMultiMaps.insert(it.key(), button);
 
         QPushButton * dBtn = new QPushButton(widget);
-        dBtn->setFixedSize(QSize(32, 32));
-        dBtn->setText("Del");
+        dBtn->setFixedSize(QSize(64, 32));
+        dBtn->setText(tr("Delete"));
         dBtn->setHidden(true);
         connect(dBtn, &QPushButton::clicked, this, [=]{
             del_autoboot_realize(bname);
@@ -291,7 +279,7 @@ void AutoBoot::initUI(){
 //                            "QPushButton:hover:pressed{background: #E54A50; border-radius: 2px;}");
 
         QLabel * pLabel = new QLabel(widget);
-        pLabel->setFixedSize(QSize(32, 32));
+        pLabel->setFixedSize(QSize(64, 32));
         pLabel->setHidden(false);
 
         mainHLayout->addWidget(iconLabel);
@@ -335,9 +323,13 @@ void AutoBoot::initUI(){
 
 
 bool AutoBoot::_copy_desktop_file_to_local(QString bname){
-    GFile * srcfile;
-    GFile * dstfile;
-    char * dstpath, * srcpath;
+//    GFile * srcfile;
+//    GFile * dstfile;
+//    GError * error;
+//    char * dstpath, * srcpath;
+
+    QString srcPath;
+    QString dstPath;
 
     //不存在则创建~/.config/autostart/
     if (!g_file_test(localconfigdir, G_FILE_TEST_EXISTS)){
@@ -347,34 +339,40 @@ bool AutoBoot::_copy_desktop_file_to_local(QString bname){
     }
 
     QMap<QString, AutoApp>::iterator it = appMaps.find(bname);
-    dstpath = g_build_filename(localconfigdir, bname.toUtf8().data(), NULL);
-    srcpath = it.value().path.toUtf8().data();
+//    dstpath = g_build_filename(localconfigdir, bname.toLatin1().data(), NULL);
+//    srcpath = it.value().path.toLatin1().data();
 
-    srcfile = g_file_new_for_path(srcpath);
-    dstfile = g_file_new_for_path(dstpath);
+    dstPath = QString(localconfigdir) + "/" + bname;
+    srcPath = it.value().path;
 
-    if (!g_file_copy(srcfile, dstfile, G_FILE_COPY_NONE, NULL, NULL, NULL, NULL)){
-        qDebug() << "Could not copy desktop file for autoboot";
-        g_object_unref(srcfile);
-        g_object_unref(dstfile);
-        g_free(dstpath);
+//    srcfile = g_file_new_for_path(srcpath);
+//    dstfile = g_file_new_for_path(dstpath);
+
+//    if (!g_file_copy(srcfile, dstfile, G_FILE_COPY_NONE, NULL, NULL, NULL, &error)){
+//        qDebug() << "Could not copy desktop file for autoboot";
+//        g_object_unref(srcfile);
+//        g_object_unref(dstfile);
+//        g_free(dstpath);
+//        return false;
+//    }
+
+    if (!QFile::copy(srcPath, dstPath))
         return false;
-    }
 
     //更新数据
     AutoApp addapp;
-    addapp = _app_new(dstpath);
+    addapp = _app_new(dstPath.toLatin1().data());
     addapp.xdg_position = ALLPOS;
 
     localappMaps.insert(addapp.bname, addapp);
 
     QMap<QString, AutoApp>::iterator updateit = statusMaps.find(bname);
     updateit.value().xdg_position = ALLPOS;
-    updateit.value().path = QString(dstpath);
+    updateit.value().path = dstPath;
 
-    g_object_unref(srcfile);
-    g_object_unref(dstfile);
-    g_free(dstpath);
+//    g_object_unref(srcfile);
+//    g_object_unref(dstfile);
+//    g_free(dstpath);
     return true;
 }
 
