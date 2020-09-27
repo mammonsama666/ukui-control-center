@@ -47,25 +47,27 @@
 #include "tips.h"
 #include "svghandler.h"
 #include "blueeffect.h"
+#include <QDialog>
 
-class MainDialog : public QWidget
+class MainDialog : public QDialog
 {
     Q_OBJECT
 public:
     explicit        MainDialog(QWidget *parent = nullptr);
     QString         status = tr("Sign in Cloud");
     int             timerout_num = 60;
-    int             timerout_num_reg = 60;
-    int             timerout_num_log = 60;
-    int             timerout_num_bind = 60;
-    QString         messagebox(int code);
+    QString         messagebox(const int &code) const;
     void            set_client(DbusHandleClient *c,QThread *t);
     QPushButton    *get_login_submit();
+    QString replace_blank(QString &str);
+    LoginDialog     *get_dialog();
     bool            retok = true;
     void            set_clear();
     void            setshow(QWidget *w);
     bool            is_used = false;
-    void            set_staus(bool ok);
+    void            set_staus(const bool &ok);
+    void            closedialog();
+    void            setnormal();
     ~MainDialog();
 
 public slots:
@@ -86,9 +88,6 @@ public slots:
     void on_send_code_reg();
     void on_send_code_log();
     void on_send_code_bind();
-    void on_timer_reg_out();
-    void on_timer_log_out();
-    void on_timer_bind_out();
     void on_close();
     void on_bind_finished(int ret,QString m_uuid);
     void on_bind_btn();
@@ -105,11 +104,12 @@ public slots:
     void set_back();
 protected:
     void            paintEvent(QPaintEvent *event);
-    void            mousePressEvent(QMouseEvent *event);
-    void            mouseMoveEvent(QMouseEvent *event);
     bool            eventFilter(QObject *w,QEvent *e);
 
 private:
+    bool            m_bAutoLogin = false;
+    QString         m_szRegAccount;
+    QString         m_szRegPass;
     QString         m_szAccount;
     QString         m_szPass;
     LoginDialog     *m_loginDialog;
@@ -147,10 +147,7 @@ private:
     QPushButton     *m_forgetpassBtn;
     QPushButton     *m_forgetpassSendBtn;
     QString         *m_szPassName;
-    QTimer          *m_cPassTimer;
-    QTimer          *m_cRegTimer;
-    QTimer          *m_cLogTimer;
-    QTimer          *m_cBindTimer;
+    QTimer          *m_timer;
     DbusHandleClient   *m_dbusClient;
     QWidget         *m_containerWidget;
     QStackedWidget  *m_baseWidget;
@@ -165,7 +162,12 @@ private:
     SVGHandler *m_svgHandler;
     QHBoxLayout    *m_animateLayout;
 
+    QString        m_PhoneLogin;
+    QString        m_NameLogin;
+
 signals:
+    void on_close_event();
+    void on_login_failed();
     void on_login_success();
     void on_allow_send();
     void dologin(QString username,QString pwd,QString uuid);
@@ -173,10 +175,10 @@ signals:
     void dogetmcode_phone_reg(QString phonenumb,QString uuid);
     void dogetmcode_number_bind(QString username,QString uuid);
     void dogetmcode_number_pass(QString username,QString uuid);
-    void dorest(QString username, QString newpwd, QString mCode,QString uuid);
-    void doreg(QString username, QString pwd, QString phonenumb, QString mcode,QString uuid);
-    void dophonelogin(QString phone, QString mCode,QString uuid);
-    void dobind(QString username, QString pwd, QString phone, QString mCode,QString uuid);
+    void dorest(QString username,QString newpwd,QString mCode,QString uuid);
+    void doreg(QString username,QString pwd,QString phonenumb,QString mcode,QString uuid);
+    void dophonelogin(QString phone,QString mCode,QString uuid);
+    void dobind(QString username,QString pwd,QString phone,QString mCode,QString uuid);
 
 };
 

@@ -94,7 +94,7 @@ LoginDialog::LoginDialog(QWidget *parent) : QWidget(parent) {
     m_accountLineEdit->setMinimumSize(338,36);
     m_accountLineEdit->setTextMargins(12,0,0,0);
     m_accountLineEdit->setFocusPolicy(Qt::StrongFocus);
-    m_accountLineEdit->setPlaceholderText(tr("Your account here"));
+    m_accountLineEdit->setPlaceholderText(tr("Your account/phone here"));
 
     //account_phone->setStyleSheet("QLineEdit{background-color:#F4F4F4;border-radius: 4px;border:1px none #3D6BE5;font-size: 14px;color: rgba(0,0,0,0.85);}"
     //                             "QLineEdit:hover{background-color:#F4F4F4;border-radius: 4px;border:1px solid #3D6BE5;font-size: 14px;color:rgba(0,0,0,0.85)}"
@@ -154,7 +154,7 @@ void LoginDialog::startaction_1() {
     if(m_stackedWidget->currentIndex() == 0) {
         set_clear();
         m_accountLineEdit->setFocus();
-        m_accountLineEdit->setText("");
+        //m_accountLineEdit->setText("");
         m_accountLineEdit->setMaxLength(11);
         QRegExp regx("^((13[0-9])|(14[5,7])|(15[0-3,5-9])|(17[0,3,5-8])|(18[0-9])|166|198|199|(147))\\d{8}$");
         QValidator *validator = new QRegExpValidator(regx, m_accountLineEdit );
@@ -188,11 +188,11 @@ void LoginDialog::set_window2() {
     startaction_2();
 }
 
-QString LoginDialog::get_user_name() {
+QString LoginDialog::get_user_name() const {
     return this->m_accountLineEdit->text();
 }
 
-QString LoginDialog::get_user_pass() {
+QString LoginDialog::get_user_pass() const {
     return this->m_passwordLineEdit->text();
 }
 
@@ -219,7 +219,7 @@ void LoginDialog::startaction_2() {
         m_accountLogin_btn->setFocusPolicy(Qt::NoFocus);
         m_phoneLogin_btn->setFocusPolicy(Qt::NoFocus);
         m_stackedWidget->setCurrentIndex(0);
-        m_accountLineEdit->setPlaceholderText(tr("Your account here"));
+        m_accountLineEdit->setPlaceholderText(tr("Your account/phone here"));
     }
 }
 
@@ -317,7 +317,7 @@ QPushButton* LoginDialog::get_user_mcode() {
     return m_sendMsgBtn;
 }
 
-void LoginDialog::set_code(QString codenum) {
+void LoginDialog::set_code(const QString &codenum) {
     m_szCode = codenum;
     emit code_changed();
 }
@@ -396,7 +396,7 @@ bool LoginDialog::login_account_thr_phone() {
     return false;
 }
 
-void LoginDialog::set_staus(bool ok) {
+void LoginDialog::set_staus(const bool &ok) {
     m_accountLogin_btn->setEnabled(ok);
     m_phoneLogin_btn->setEnabled(ok);
     m_passwordLineEdit->setEnabled(ok);
@@ -418,7 +418,7 @@ void LoginDialog::set_clear() {
     }
     m_passwordLineEdit->get_visble()->setChecked(false);
     m_passwordLineEdit->setText("");
-    m_accountLineEdit->setText("");
     m_mcodePhoneLineEdit->setText("");
     m_mcodeNormalLineEdit->setText("");
 }
+

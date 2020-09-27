@@ -21,7 +21,9 @@
 #include <QDesktopWidget>
 #include <QApplication>
 
-MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
+extern void qt_blurImage(QImage &blurImage, qreal radius, bool quality, int transposed);
+
+MainDialog::MainDialog(QWidget *parent) : QDialog(parent)
 {
     //内存分配
     m_uuid = QUuid::createUuid().toString();
@@ -39,10 +41,7 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     m_workLayout = new QVBoxLayout;           //业务界面主体布局
     m_subLayout = new QHBoxLayout;           //切换登录模式按钮布局
     m_delBtn = new QPushButton(this);        //关闭按钮
-    m_cPassTimer = new QTimer(this);               //以下都是验证码倒计时计时器，后缀相互对应
-    m_cRegTimer  = new QTimer(this);
-    m_cLogTimer = new QTimer(this);
-    m_cBindTimer = new QTimer(this);
+    m_timer = new QTimer(this);
     m_successDialog = new SuccessDiaolog(this);        //注册成功页面
     QHBoxLayout *hbox = new QHBoxLayout;    //整体布局
     m_blueEffect = new Blueeffect(m_submitBtn);
@@ -57,11 +56,7 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
 
 
     //计时器初始化
-    m_cPassTimer->stop();
-    m_cRegTimer->stop();
-    m_cLogTimer->stop();
-    m_cBindTimer->stop();
-
+    m_timer->stop();
     //隐藏同步开关动画
 
     //控件尺寸以及布局设置
@@ -78,7 +73,7 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
 
     m_titleLable->setText(status);
     m_titleLable->adjustSize();
-    //setFocusPolicy(Qt::NoFocus);
+    setFocusPolicy(Qt::NoFocus);
     m_loginDialog->setContentsMargins(0,0,0,0);
     //title->setGeometry(31 + sizeoff,48 + sizeoff,160,24);
     m_titleLable->setStyleSheet("font-size: 24px;font-weight:500;");
@@ -113,10 +108,10 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     m_delBtn->setFlat(true);
     QPixmap pixmap = m_svgHandler->loadSvg(":/new/image/delete.svg");
     m_delBtn->setIcon(pixmap);
-    m_delBtn->setStyleSheet("QPushButton{background:transparent;border-radius:4px;}"
-                           "QPushButton:hover{background:transparent;background-color:#F86457;"
+    m_delBtn->setStyleSheet("QPushButton{border-radius:4px;}"
+                           "QPushButton:hover{background-color:#F86457;"
                            "border-radius:4px}"
-                           "QPushButton:click{background:transparent;background-color:#E44C50;border-radius:4px}");
+                           "QPushButton:click{background-color:#E44C50;border-radius:4px}");
 
     m_delBtn->installEventFilter(this);
 
@@ -125,7 +120,8 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     //主窗口布局样式设置
     //setStyleSheet("Dialog_login_reg{border-radius:6px;}");
     setAttribute(Qt::WA_TranslucentBackground, true);
-    setWindowFlags(Qt::FramelessWindowHint);
+    setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
+    setModal(true);
 
     m_workLayout->setSpacing(0);
     m_workLayout->setContentsMargins(41,55,41,36);
@@ -210,10 +206,7 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     connect(m_regBtn,SIGNAL(clicked()),this,SLOT(linked_register_btn()));
     connect(m_submitBtn,SIGNAL(clicked()),this,SLOT(on_login_btn()));
     connect(m_forgetpassBtn,SIGNAL(clicked()),this,SLOT(on_send_code()));
-    connect(m_cPassTimer,SIGNAL(timeout()),this,SLOT(on_timer_timeout()));
-    connect(m_cRegTimer,SIGNAL(timeout()),this,SLOT(on_timer_reg_out()));
-    connect(m_cLogTimer,SIGNAL(timeout()),this,SLOT(on_timer_log_out()));
-    connect(m_cBindTimer,SIGNAL(timeout()),this,SLOT(on_timer_bind_out()));
+    connect(m_timer,SIGNAL(timeout()),this,SLOT(on_timer_timeout()));
     connect(m_regSendCodeBtn,SIGNAL(clicked()),this,SLOT(on_send_code_reg()));
     connect(m_forgetpassSendBtn,SIGNAL(clicked()),this,SLOT(on_send_code_log()));
     connect(m_BindDialog->get_send_code(),SIGNAL(clicked()),this,SLOT(on_send_code_bind()));
@@ -227,6 +220,23 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     connect(m_passDialog->get_valid_code(),SIGNAL(returnPressed()),m_submitBtn,SIGNAL(clicked()),Qt::UniqueConnection);
     connect(m_loginDialog->get_stack_widget(),&QStackedWidget::currentChanged,[this] (int) {
         m_blueEffect->stop();
+    });
+
+    connect(m_loginAccountLineEdit,&QLineEdit::textChanged,[this] (const QString &changed) {
+        // qDebug() << changed;
+       if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
+           m_NameLogin = changed;
+       } else {
+           m_PhoneLogin = changed;
+       }
+    });
+
+    connect(m_loginDialog->get_stack_widget(),&QStackedWidget::currentChanged,[this] (int index) {
+        if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
+            m_loginAccountLineEdit->setText(m_NameLogin);
+        } else {
+            m_loginAccountLineEdit->setText(m_PhoneLogin);
+        }
     });
     //为各个子控件安装事件过滤
     m_submitBtn->installEventFilter(this);
@@ -255,26 +265,23 @@ MainDialog::MainDialog(QWidget *parent) : QWidget(parent)
     m_stackedWidget->installEventFilter(this);
 
     //对话框模态处理
-    setWindowModality(Qt::ApplicationModal);
+    //setWindowModality(Qt::ApplicationModal);
     //把对话框放置屏幕中央
     QDesktopWidget* desktop = QApplication::desktop();
     move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
 
     //初始化一下验证码计时器激活时间
-    timerout_num_bind = 60;
     timerout_num = 60;
-    timerout_num_log = 60;
-    timerout_num_reg = 60;
 }
 
 /* 确认密码框如果遇到新密码或者注册密码改变，立即改变
- * 成空的状态，防止用户多余操作*/
+ * 成空的状态，防止用户多余操作(舍弃）*/
 void MainDialog::cleanconfirm(QString str) {
     //qDebug()<<str;
     if(m_stackedWidget->currentWidget() == m_passDialog) {
-        m_passConfirmLineEdit->setText("");
+        //m_passConfirmLineEdit->setText("");
     } else if(m_stackedWidget->currentWidget() == m_regDialog) {
-        m_regConfirmLineEdit->setText("");
+        //m_regConfirmLineEdit->setText("");
     }
 }
 
@@ -346,6 +353,7 @@ void MainDialog::setret_reg(int ret) {
 }
 
 void MainDialog::setret_login(int ret) {
+    //qDebug() << "ssssssssssssssss";
     if(ret != 0) {
         m_loginDialog->get_mcode_lineedit()->setText("");
         if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
@@ -363,7 +371,7 @@ void MainDialog::setret_login(int ret) {
         }
         return ;
     } else {
-
+        //qDebug() << ret;
     }
 }
 
@@ -478,18 +486,23 @@ void MainDialog::setret_code_user_pass(int ret) {
     }
 }
 
+LoginDialog* MainDialog::get_dialog() {
+    return m_loginDialog;
+}
+
 /* 错误消息提示盒子，所有服务器消息基本上来源于此，默认
  * 返回未知代码，显示错误以及代码编号 */
-QString MainDialog::messagebox(int code) {
+QString MainDialog::messagebox(const int &code) const {
     QString ret = tr("Error code:") + QString::number(code,10)+ tr("!");
     switch(code) {
-    case 101:ret = tr("Internal error occurring!");break;
+    case 101:ret = tr("Internal error occurred!");break;
     case 102:ret = tr("Failed to sign up!");break;
     case 103:ret = tr("Failed attempt to return value!");break;
     case 104:ret = tr("Check your connection!");break;
     case 105:ret = tr("Failed to get by phone!");break;
     case 106:ret = tr("Failed to get by user!");break;
     case 107:ret = tr("Failed to reset password!");break;
+    case 108:ret = tr("Timeout!");break;
     case 109:ret = tr("Phone binding falied!");break;
     case 110:ret = tr("Please check your information!");break;
     case 401:ret = tr("Please check your account!");break;
@@ -503,7 +516,7 @@ QString MainDialog::messagebox(int code) {
     case 614:ret = tr("Please check your code!");break;
     case 615:ret = tr("Account doesn't exist!");break;
     case 616:ret = tr("User has bound the phone!");break;
-    case 619:ret = tr("Sending code error occurring!");break;
+    case 619:ret = tr("Sending code error occurred!");break;
     case -1:ret = tr("Please check your information!");break;
 
     }
@@ -517,7 +530,8 @@ void MainDialog::on_login_btn() {
     m_delBtn->setEnabled(true);
     //如果验证码输入错误，执行此处
     if(m_loginDialog->get_stack_widget()->currentIndex() == 0 &&
-        QString(m_loginDialog->get_mcode_widget()->get_verificate_code()) != m_loginDialog->get_mcode_lineedit()->text()) {
+        QString(m_loginDialog->get_mcode_widget()->get_verificate_code()) != m_loginDialog->get_mcode_lineedit()->text() &&
+            m_bAutoLogin == false) {
         m_loginDialog->set_code(tr("Your code is wrong!"));
         m_loginTips->show();
         m_baseWidget->setEnabled(true);
@@ -527,21 +541,32 @@ void MainDialog::on_login_btn() {
         setshow(m_stackedWidget);
         m_loginDialog->get_mcode_lineedit()->setText("");
         m_loginDialog->get_mcode_widget()->set_change(0);
+        emit on_login_failed();
+        return ;
+    }
+    if(m_loginDialog->get_user_name().length() < 11 && m_loginDialog->get_stack_widget()->currentIndex() == 1) {
+        m_baseWidget->setEnabled(true);
+        m_loginDialog->set_code(tr("Please check your phone!"));
+        m_loginTips->show();
+        set_staus(true);
+        setshow(m_stackedWidget);
+        emit on_login_failed();
         return ;
     }
     //如果信息正确可提交，执行此处
     if(m_loginDialog->get_user_name() != "" &&
         m_loginDialog->get_user_pass() != "" &&
         m_loginDialog->get_stack_widget()->currentIndex() == 0){
-        QString name,pass;
         m_szAccount = m_loginDialog->get_user_name();
         m_szPass = m_loginDialog->get_user_pass();
-        name = m_loginDialog->get_user_name();
-        //qDebug()<<"1111111";
-        pass = m_loginDialog->get_user_pass();
+
+        m_szRegPass = m_szPass;
+        m_szRegAccount = m_szAccount;
+        //qDebug()<<m_szRegPass<<m_szRegAccount;
+
         m_submitBtn->setText("");
         m_blueEffect->startmoive();
-        emit dologin(name,pass,m_uuid);            //触发登录信号，告知客户端进行登录操作
+        emit dologin(m_szRegAccount,m_szRegPass,m_uuid);            //触发登录信号，告知客户端进行登录操作
 
     } else if(m_loginDialog->get_user_name() != ""
                && m_loginDialog->get_login_code()->text() != ""
@@ -549,8 +574,11 @@ void MainDialog::on_login_btn() {
         QString phone,mcode;                    //如果用户选择手机登录，执行此处
         phone = m_loginDialog->get_user_name();
         mcode = m_loginDialog->get_login_code()->text();
+        m_submitBtn->setText("");
+        m_blueEffect->startmoive();
         emit dophonelogin(phone,mcode,m_uuid);
     } else {
+        emit on_login_failed();
         //信息填写不完整执行此处，包括密码登录以及手机登录
         if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
             m_loginDialog->set_code(messagebox(-1));
@@ -572,6 +600,29 @@ void MainDialog::on_login_btn() {
             return ;
         }
     }
+}
+
+QString MainDialog::replace_blank(QString &str) {
+    QString filter = "";
+    QString ret = "";
+    bool first = false;
+    for(QChar c : str) {
+        if(c != ' ' && !first) {
+            filter.push_front(c);
+            first = true;
+        } else if(first) {
+            filter.push_front(c);
+        }
+    }
+    for(QChar c : filter) {
+        if(c != ' ' && !first) {
+            ret.push_front(c);
+            first = true;
+        } else if(first) {
+            ret.push_front(c);
+        }
+    }
+    return ret;
 }
 
 /* 2.注册逻辑处理槽函数 */
@@ -596,20 +647,42 @@ void MainDialog::on_reg_btn() {
         passwd = m_regDialog->get_user_passwd();
         mcode = m_regDialog->get_user_mcode();
         confirm = m_regDialog->get_reg_confirm()->text();
+        if(account.startsWith(" ") || account.endsWith(" ")) {
+            replace_blank(account);
+        }
+
+        if(passwd.startsWith(" ") || passwd.endsWith(" ")) {
+            replace_blank(passwd);
+        }
+
+        if(confirm.startsWith(" ") || confirm.endsWith(" ")) {
+            replace_blank(confirm);
+        }
+
+        if(m_regDialog->get_phone_user()->text().length() < 11) {
+            m_baseWidget->setEnabled(true);
+            m_regDialog->set_code(tr("Please check your phone!"));
+            m_errorRegTips->show();
+            setshow(m_stackedWidget);
+            return ;
+        }
+
         if(confirm != passwd) {
             m_baseWidget->setEnabled(true);
-            m_passDialog->set_code(tr("Please check your password!"));
-            m_errorPassTips->show();
+            m_regDialog->set_code(tr("Please check your password!"));
+            m_errorRegTips->show();
             setshow(m_stackedWidget);
             return ;
         }
         if(!m_regDialog->get_reg_pass()->check()) {
             m_baseWidget->setEnabled(true);
-            m_passDialog->set_code(tr("Please check your password!"));
+            m_passDialog->set_code(tr("Please make sure your password is safety!"));
             m_errorPassTips->show();
             setshow(m_stackedWidget);
             return ;
         }
+        m_szRegAccount = account;
+        m_szRegPass = passwd;
         emit doreg(account,passwd,phone,mcode,m_uuid);
     } else {
         m_baseWidget->setEnabled(true);
@@ -643,7 +716,7 @@ void MainDialog::on_pass_btn() {
 
         if(m_passDialog->get_reg_pass()->check() == false) {
             m_baseWidget->setEnabled(true);
-            m_passDialog->set_code(tr("At least 6 bit, include letters and digt"));
+            m_passDialog->set_code(tr("Please make sure your password is safety!"));
             m_errorPassTips->show();
             setshow(m_stackedWidget);
             return ;
@@ -699,6 +772,8 @@ void MainDialog::on_bind_btn() {
 
 /* 从成功注册，修改密码成功界面返回所需要的处理 */
 void MainDialog::back_normal() {
+    //回到登录框
+
     m_delBtn->show();
     //qDebug()<<"back normal";
     m_baseWidget->setCurrentWidget(m_containerWidget);
@@ -707,6 +782,13 @@ void MainDialog::back_normal() {
     m_titleLable->setText(tr("Sign in Cloud"));
     m_stackedWidget->setCurrentWidget(m_loginDialog);
     m_loginDialog->set_clear();
+
+    //设置注册时候的账号密码为登录账号密码，然后执行登录逻辑
+    if(m_bAutoLogin == true) {
+        m_loginDialog->get_login_pass()->setText(m_szRegPass);
+        m_loginDialog->get_user_edit()->setText(m_szRegAccount);
+        m_submitBtn->click();
+    }
 }
 
 /* 从忘记密码或者注册界面或者或者手机绑定
@@ -795,7 +877,19 @@ void MainDialog::linked_register_btn() {
 void MainDialog::on_send_code_reg() {
     QString phone;
     m_regDialog->get_send_code()->setEnabled(false);
+    if(m_regDialog->get_phone_user()->text().length() < 11) {
+        m_baseWidget->setEnabled(true);
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
+        m_regDialog->set_code(tr("Please check your phone!"));
+        m_errorRegTips->show();
+        setshow(m_stackedWidget);
+        m_regDialog->get_send_code()->setEnabled(true);
+        return ;
+    }
     if( m_regDialog->get_user_account() == "" || m_regDialog->get_user_phone() == "") {
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
         m_regDialog->get_valid_code()->setText("");
         m_regDialog->set_code(messagebox(-1));
         m_errorRegTips->show();
@@ -803,11 +897,33 @@ void MainDialog::on_send_code_reg() {
         setshow(m_stackedWidget);
         return ;
     }
-    if(m_regDialog->get_reg_pass()->check() == false) {
+    if(m_regDialog->get_phone_user()->text().length() < 11) {
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
         m_regDialog->get_send_code()->setEnabled(true);
         m_regDialog->get_valid_code()->setText("");
-        m_regDialog->set_code(tr("At least 6 bit, include letters and digt"));
-            m_errorRegTips->show();
+        m_regDialog->set_code(tr("Please check your phone!"));
+        m_errorRegTips->show();
+        setshow(m_stackedWidget);
+        return ;
+    }
+    if(m_regDialog->get_reg_pass()->check() == false) {
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
+        m_regDialog->get_send_code()->setEnabled(true);
+        m_regDialog->get_valid_code()->setText("");
+        m_regDialog->set_code(tr("Please make sure your password is safety!"));
+        m_errorRegTips->show();
+        setshow(m_stackedWidget);
+        return ;
+    }
+    if(m_regDialog->get_reg_confirm()->text() != m_regDialog->get_reg_pass()->text()) {
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
+        m_regDialog->get_send_code()->setEnabled(true);
+        m_regDialog->get_valid_code()->setText("");
+        m_regDialog->set_code(tr("Please confirm your password!"));
+        m_errorRegTips->show();
         setshow(m_stackedWidget);
         return ;
     }
@@ -815,6 +931,8 @@ void MainDialog::on_send_code_reg() {
         phone = m_regDialog->get_user_phone();
         emit dogetmcode_phone_reg(phone,m_uuid);
     } else {
+        m_regTips->hide();
+        m_regDialog->get_user_tip()->hide();
         m_regDialog->get_send_code()->setEnabled(true);
         m_regDialog->get_valid_code()->setText("");
         m_regDialog->set_code(messagebox(-1));
@@ -827,8 +945,17 @@ void MainDialog::on_send_code_reg() {
 
 /* 手机登录验证码发送按钮处理 */
 void MainDialog::on_send_code_log() {
+    //qDebug() <<m_loginDialog->get_user_name().length();
     QString phone;
     m_loginDialog->get_user_mcode()->setEnabled(false);
+    if(m_loginDialog->get_user_name().length() < 11) {
+        m_baseWidget->setEnabled(true);
+        m_loginDialog->get_user_mcode()->setEnabled(true);
+        m_loginDialog->set_code(tr("Please check your phone!"));
+        m_loginCodeStatusTips->show();
+        setshow(m_stackedWidget);
+        return ;
+    }
     if(m_loginDialog->get_user_name() != "") {
         phone = m_loginDialog->get_user_name();
         emit dogetmcode_phone_log(phone,m_uuid);
@@ -848,6 +975,14 @@ void MainDialog::on_send_code_bind() {
     QString name;
     int ret = -1;
     m_BindDialog->get_send_code()->setEnabled(false);
+    if(m_BindDialog->get_phone_lineedit()->text().length() < 11) {
+        m_baseWidget->setEnabled(true);
+        m_BindDialog->get_send_code()->setEnabled(true);
+        m_BindDialog->set_code(tr("Please check your phone!"));
+        m_BindDialog->get_tips()->show();
+        setshow(m_stackedWidget);
+        return ;
+    }
     if(m_BindDialog->get_phone() != "") {
         //qstrcpy(name,box_bind->get_phone().toStdString().c_str());
         name = m_BindDialog->get_phone();
@@ -868,7 +1003,15 @@ void MainDialog::on_send_code() {
     m_passDialog->get_send_msg_btn()->setEnabled(false);
     if(m_passDialog->get_reg_pass()->check() == false) {
         m_passDialog->get_valid_code()->setText("");
-        m_passDialog->set_code(tr("At least 6 bit, include letters and digt"));
+        m_passDialog->set_code(tr("Please make sure your password is safety!"));
+        m_errorPassTips->show();
+        m_passDialog->get_send_msg_btn()->setEnabled(true);
+        setshow(m_stackedWidget);
+        return ;
+    }
+    if(m_passDialog->get_reg_pass()->text() != m_passDialog->get_reg_pass_confirm()->text()) {
+        m_passDialog->get_valid_code()->setText("");
+        m_passDialog->set_code(tr("Please confirm your password!"));
         m_errorPassTips->show();
         m_passDialog->get_send_msg_btn()->setEnabled(true);
         setshow(m_stackedWidget);
@@ -892,66 +1035,49 @@ void MainDialog::on_send_code() {
 /* 忘记密码验证码的计时器处理 */
 void MainDialog::on_timer_timeout() {
     if(timerout_num > 0) {
+
+        m_timer->start(1000);
+        m_forgetpassSendBtn->setEnabled(false);
+        m_forgetpassSendBtn->setText(tr("Resend ( %1 )").arg(timerout_num));
+        m_regSendCodeBtn->setEnabled(false);
+        m_regSendCodeBtn->setText(tr("Resend ( %1 )").arg(timerout_num));
+        m_forgetpassBtn->setEnabled(false);
         m_forgetpassBtn->setText(tr("Resend ( %1 )").arg(timerout_num));
+
+        m_BindDialog->get_send_code()->setEnabled(false);
+        m_BindDialog->get_send_code()->setText(tr("Resend ( %1 )").arg(timerout_num));
+
+
         timerout_num --;
-    }else if(timerout_num == 0) {
+    } else if(timerout_num == 0) {
         timerout_num = 60;
+        m_forgetpassSendBtn->setEnabled(true);
+        m_forgetpassSendBtn->setText(tr("Get"));
+
+        m_regSendCodeBtn->setEnabled(true);
+        m_regSendCodeBtn->setText(tr("Get"));
+
+        m_BindDialog->get_send_code()->setEnabled(true);
+        m_BindDialog->get_send_code()->setText(tr("Get"));
+
         m_forgetpassBtn->setEnabled(true);
         m_forgetpassBtn->setText(tr("Get phone code"));
-        m_cPassTimer->stop();
-    }
-}
-
-/* 绑定手机验证码的计时器处理 */
-void MainDialog::on_timer_bind_out() {
-    if(timerout_num_bind > 0) {
-        m_BindDialog->get_send_code()->setText(tr("Resend ( %1 )").arg(timerout_num_bind));
-        timerout_num_bind --;
-    }else if(timerout_num_bind == 0) {
-        timerout_num_bind = 60;
-        m_BindDialog->get_send_code()->setEnabled(true);
-        m_BindDialog->get_send_code()->setText(tr("Get phone code"));
-        m_cBindTimer->stop();
-    }
-}
-
-/* 手机登录验证码的计时器处理 */
-void MainDialog::on_timer_log_out() {
-    if(timerout_num_log > 0) {
-        m_forgetpassSendBtn->setText(tr("Resend ( %1 )").arg(timerout_num_log));
-        timerout_num_log --;
-    }else if(timerout_num_log == 0) {
-        timerout_num_log = 60;
-        m_forgetpassSendBtn->setEnabled(true);
-        m_forgetpassSendBtn->setText(tr("Send"));
-        m_cLogTimer->stop();
-    }
-}
-
-/* 注册账户验证码的计时器处理 */
-void MainDialog::on_timer_reg_out() {
-    if(timerout_num_reg > 0) {
-        m_regSendCodeBtn->setText(tr("Resend ( %1 )").arg(timerout_num_reg));
-        timerout_num_reg --;
-    }else if(timerout_num_reg == 0) {
-        timerout_num_reg = 60;
-        m_regSendCodeBtn->setEnabled(true);
-        m_regSendCodeBtn->setText(tr("Send"));
-        m_cRegTimer->stop();
+        m_timer->stop();
     }
 }
 
 /* 登录回调槽函数，登录回执消息后执行此处 */
-void MainDialog::on_login_finished(int ret,QString uuid) {
+void MainDialog::on_login_finished(int ret, QString uuid) {
+    //qDebug() << "ssssssssssssssss2";
     if(uuid != this->m_uuid) {
-        qDebug()<<uuid<<this->m_uuid;
+        //qDebug()<<uuid<<this->m_uuid;
         return ;
     }
-    qDebug()<<ret;
-    m_baseWidget->setEnabled(true);
-    set_staus(true);
+    //qDebug()<<ret;
     //无手机号码绑定，进入手机号码绑定页面
     if(ret == 119) {
+        emit on_login_failed();
+        set_back();
         m_blueEffect->stop();
         m_titleLable->setText(tr("Binding Phone"));
         m_stackedWidget->setCurrentWidget(m_BindDialog);
@@ -967,14 +1093,13 @@ void MainDialog::on_login_finished(int ret,QString uuid) {
     }
     //登录返回成功，执行此处
     if(ret == 0) {
-        m_blueEffect->stop();
-        timerout_num_log = 0;
-        m_cLogTimer->stop();
-        m_forgetpassSendBtn->setEnabled(true);
-        m_forgetpassSendBtn->setText(tr("Send"));
-        m_submitBtn->setText(tr("Sign in"));
+        //m_blueEffect->stop();
+        //m_submitBtn->setText(tr("Sign in"));
         emit on_login_success(); //发送成功登录信号给主页面
     } else {
+        //qDebug() << "cscacacasca";
+        emit on_login_failed();
+        set_back();
         m_blueEffect->stop();             //登录失败，执行此处，关闭登录执行过程效果，并打印错误消息
         m_submitBtn->setText(tr("Sign in"));
         if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
@@ -994,14 +1119,14 @@ void MainDialog::on_login_finished(int ret,QString uuid) {
 }
 
 /* 手机绑定回调槽函数，手机绑定回执消息后执行此处 */
-void MainDialog::on_bind_finished(int ret,QString uuid) {
+void MainDialog::on_bind_finished(int ret, QString uuid) {
     if(uuid != this->m_uuid) {
         return ;
     }
     m_baseWidget->setEnabled(true);
     if(ret == 0) {
-        timerout_num_bind = 0;
-        m_cBindTimer->stop();
+        timerout_num = 0;
+        m_timer->stop();
         m_submitBtn->setText(tr("Sign in"));
         m_BindDialog->get_send_code()->setEnabled(true);
         m_BindDialog->get_send_code()->setText(tr("Send"));
@@ -1010,6 +1135,7 @@ void MainDialog::on_bind_finished(int ret,QString uuid) {
         m_regBtn->setText(tr("Sign up"));
         m_stackedWidget->setCurrentWidget(m_loginDialog);
         setshow(m_stackedWidget);
+        m_bAutoLogin = true;
         m_baseWidget->setCurrentWidget(m_successDialog);
         m_successDialog->set_mode_text(3);
         disconnect(m_submitBtn,SIGNAL(clicked()),this,SLOT(on_bind_btn()));
@@ -1025,15 +1151,15 @@ void MainDialog::on_bind_finished(int ret,QString uuid) {
 }
 
 /* 注册回调槽函数，注册回执消息后执行此处 */
-void MainDialog::on_reg_finished(int ret,QString uuid) {
+void MainDialog::on_reg_finished(int ret, QString uuid) {
     if(this->m_uuid != uuid) {
         return ;
     }
     m_baseWidget->setEnabled(true);
-    //qDebug()<<ret;
+   // qDebug()<<ret;
     if(ret == 0) {
-        timerout_num_reg = 0;
-        m_cRegTimer->stop();
+        timerout_num= 0;
+        m_timer->stop();
         m_regSendCodeBtn->setEnabled(true);
         m_regSendCodeBtn->setText(tr("Send"));
         m_submitBtn->setText(tr("Sign in"));
@@ -1041,6 +1167,7 @@ void MainDialog::on_reg_finished(int ret,QString uuid) {
         m_regDialog->get_reg_user()->clear();
         m_regDialog->get_phone_user()->clear();
         m_regDialog->get_valid_code()->clear();
+        m_bAutoLogin = true;
         m_baseWidget->setCurrentWidget(m_successDialog);
         m_delBtn->hide();
         m_successDialog->set_mode_text(0);
@@ -1070,7 +1197,7 @@ void MainDialog::on_pass_finished(int ret,QString uuid) {
     if(ret == 0) {
         //qDebug()<<"cascascascascascascascascascascasca";
         timerout_num = 0;
-        m_cPassTimer->stop();
+        m_timer->stop();
         //qDebug()<<"wb11";
         m_forgetpassBtn->setEnabled(true);
         m_forgetpassBtn->setText(tr("Send"));
@@ -1101,10 +1228,11 @@ void MainDialog::on_pass_finished(int ret,QString uuid) {
 }
 
 /* 手机号直接发送验证码回调函数，发送手机验证码回执消息后执行此处 */
-void MainDialog::on_get_mcode_by_phone(int ret,QString uuid) {
+void MainDialog::on_get_mcode_by_phone(int ret, QString uuid) {
     if(uuid != this->m_uuid) {
         return ;
     }
+    //qDebug() << ret;
     if(ret != 0) {
         if(m_stackedWidget->currentWidget() == m_loginDialog) {
             m_loginDialog->get_user_mcode()->setEnabled(true);
@@ -1118,6 +1246,8 @@ void MainDialog::on_get_mcode_by_phone(int ret,QString uuid) {
             }
             setshow(m_stackedWidget);
         } else if(m_stackedWidget->currentWidget() == m_regDialog) {
+            m_regTips->hide();
+            m_regDialog->get_user_tip()->hide();
             m_regDialog->get_send_code()->setEnabled(true);
             m_regDialog->get_valid_code()->setText("");
             m_regDialog->set_code(messagebox(ret));
@@ -1138,23 +1268,13 @@ void MainDialog::on_get_mcode_by_phone(int ret,QString uuid) {
         }
         return ;
     } else if(ret == 0) {
-        if(m_stackedWidget->currentWidget() == m_loginDialog) {
-            m_cLogTimer->start(1000);
-            timerout_num_log = 60;
-            m_forgetpassSendBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_regDialog) {
-            m_cRegTimer->start(1000);
-            timerout_num_reg = 60;
-            m_regSendCodeBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_passDialog) {
-            m_cPassTimer->start(1000);
-            timerout_num = 60;
-            m_forgetpassBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_BindDialog) {
-            m_cBindTimer->start(1000);
-            timerout_num_bind = 60;
-            m_BindDialog->get_send_code()->setEnabled(false);
-        }
+        m_forgetpassSendBtn->setEnabled(false);
+        m_regSendCodeBtn->setEnabled(false);
+        timerout_num = 60;
+        m_forgetpassBtn->setEnabled(false);
+
+        m_BindDialog->get_send_code()->setEnabled(false);
+        m_timer->start(1000);
     }
 }
 
@@ -1180,6 +1300,8 @@ void MainDialog::on_get_mcode_by_name(int ret,QString uuid) {
             }
             setshow(m_stackedWidget);
         } else if(m_stackedWidget->currentWidget() == m_regDialog) {
+            m_regTips->hide();
+            m_regDialog->get_user_tip()->hide();
             m_regDialog->get_send_code()->setEnabled(true);
             m_regDialog->get_valid_code()->setText("");
             m_regDialog->set_code(messagebox(ret));
@@ -1200,84 +1322,57 @@ void MainDialog::on_get_mcode_by_name(int ret,QString uuid) {
         }
         return ;
     }  else if(ret == 0) {
-        if(m_stackedWidget->currentWidget() == m_loginDialog) {
-            m_loginDialog->get_user_mcode()->setEnabled(true);
-            m_cLogTimer->start(1000);
-            timerout_num_log = 60;
-            m_forgetpassSendBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_regDialog) {
-            m_regDialog->get_send_code()->setEnabled(true);
-            m_cRegTimer->start(1000);
-            timerout_num_reg = 60;
-            m_regSendCodeBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_passDialog) {
-            m_passDialog->get_send_msg_btn()->setEnabled(true);
-            m_cPassTimer->start(1000);
-            timerout_num = 60;
-            m_forgetpassBtn->setEnabled(false);
-        } else if(m_stackedWidget->currentWidget() == m_BindDialog) {
-            m_BindDialog->get_send_code()->setEnabled(true);
-            m_cBindTimer->start(1000);
-            timerout_num_bind = 60;
-            m_BindDialog->get_send_code()->setEnabled(false);
-        }
+        m_forgetpassSendBtn->setEnabled(false);
+        m_regSendCodeBtn->setEnabled(false);
+        timerout_num = 60;
+        m_forgetpassBtn->setEnabled(false);
+
+        m_BindDialog->get_send_code()->setEnabled(false);
+        m_timer->start(1000);
     }
 }
 
 /* 窗口重绘，加入阴影 */
 void MainDialog::paintEvent(QPaintEvent *event)
 {
-    QStyleOption opt;
-    opt.init(this);
+    Q_UNUSED(event)
+
     QPainter p(this);
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+    p.setRenderHint(QPainter::Antialiasing);
+    QPainterPath rectPath;
+    rectPath.addRoundedRect(this->rect().adjusted(10, 10, -10, -10), 6, 6);
 
-    QPainter painter(this);
-    QColor m_defaultBackgroundColor = qRgb(0, 0, 0);
-    QPainterPath path1;
-    path1.setFillRule(Qt::WindingFill);
-    path1.addRoundedRect(10, 10, this->width() - 20, this->height() - 20, 6, 6);
+    // 画一个黑底
+    QPixmap pixmap(this->rect().size());
+    pixmap.fill(Qt::transparent);
+    QPainter pixmapPainter(&pixmap);
+    pixmapPainter.setRenderHint(QPainter::Antialiasing);
+    pixmapPainter.setPen(Qt::transparent);
+    pixmapPainter.setBrush(Qt::black);
+    pixmapPainter.setOpacity(0.65);
+    pixmapPainter.drawPath(rectPath);
+    pixmapPainter.end();
 
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.fillPath(path1, QBrush(QColor(m_defaultBackgroundColor.red(),
-                                          m_defaultBackgroundColor.green(),
-                                          m_defaultBackgroundColor.blue())));
+    // 模糊这个黑底
+    QImage img = pixmap.toImage();
+    qt_blurImage(img, 10, false, false);
 
-    QColor color(0, 0, 0, 15);
-    for (int i = 0; i < 6; i++)
-    {
-        QPainterPath path;
-        path.setFillRule(Qt::WindingFill);
-        path.addRoundedRect(10 - i, 10 - i, this->width() - (10 - i) * 2, this->height() - (10 - i) * 2, 6, 6);
-        color.setAlpha(120 - qSqrt(i) * 50);
-        painter.setPen(color);
-        painter.drawPath(path);
-    }
+    // 挖掉中心
+    pixmap = QPixmap::fromImage(img);
+    QPainter pixmapPainter2(&pixmap);
+    pixmapPainter2.setRenderHint(QPainter::Antialiasing);
+    pixmapPainter2.setCompositionMode(QPainter::CompositionMode_Clear);
+    pixmapPainter2.setPen(Qt::transparent);
+    pixmapPainter2.setBrush(Qt::transparent);
+    pixmapPainter2.drawPath(rectPath);
 
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setBrush(QBrush(palette().color(QPalette::Base)));
-    painter.setPen(Qt::transparent);
-    QRect rect = this->rect();
-    rect.setX(10);
-    rect.setY(10);
-    rect.setWidth(rect.width() - 10);
-    rect.setHeight(rect.height() - 10);
-    // rect: 绘制区域  10 圆角弧度　6px
-    painter.drawRoundedRect(rect, 6, 6);
-}
+    // 绘制阴影
+    p.drawPixmap(this->rect(), pixmap, pixmap.rect());
 
-/* 使得窗口可以任意移动 */
-void MainDialog::mousePressEvent(QMouseEvent *event)
-{
-    if (event->button() == Qt::LeftButton) {
-        m_startPoint = frameGeometry().topLeft() - event->globalPos();
-    }
-}
-
-/* 按下鼠标使得窗口可以任意移动 */
-void MainDialog::mouseMoveEvent(QMouseEvent *event)
-{
-    this->move(event->globalPos() + m_startPoint);
+    // 绘制一个背景
+    p.save();
+    p.fillPath(rectPath,palette().color(QPalette::Base));
+    p.restore();
 }
 
 /* 子控件事件过滤，主要针对获得或者失去焦点时捕捉 */
@@ -1294,178 +1389,187 @@ bool MainDialog::eventFilter(QObject *w, QEvent *e) {
         }
     }
     //手机绑定的四个控件捕捉
-    if(w == m_BindDialog->get_code_lineedit()) {
-        if (e->type() == QEvent::FocusIn && !m_BindDialog->get_tips()->isHidden()) {
-            m_BindDialog->get_tips()->hide();
-            setshow(m_stackedWidget);
+    if(m_stackedWidget->currentWidget() == m_BindDialog) {
+        if(w == m_BindDialog->get_code_lineedit()) {
+            if (e->type() == QEvent::FocusIn && !m_BindDialog->get_tips()->isHidden()) {
+                m_BindDialog->get_tips()->hide();
+                setshow(m_stackedWidget);
+            }
         }
-    }
-    if(w == m_BindDialog->get_phone_lineedit()) {
-        if (e->type() == QEvent::FocusIn && !m_BindDialog->get_tips()->isHidden()) {
-            m_BindDialog->get_tips()->hide();
-            setshow(m_stackedWidget);
+        if(w == m_BindDialog->get_phone_lineedit()) {
+            if (e->type() == QEvent::FocusIn && !m_BindDialog->get_tips()->isHidden()) {
+                m_BindDialog->get_tips()->hide();
+                setshow(m_stackedWidget);
+            }
         }
     }
 
     //注册页面的控件捕捉
-    if(w == m_regAccountLineEdit) {
-        if (e->type() == QEvent::FocusIn && m_accountTips->isHidden()) {
+    if(m_stackedWidget->currentWidget() == m_regDialog ) {
+        //qDebug() << "21132131";
+        if(w == m_regAccountLineEdit) {
+            if (e->type() == QEvent::FocusIn && m_accountTips->isHidden()) {
+                //qDebug() << "sssss";
+                m_accountTips->show();
 
-            m_accountTips->show();
+                //setshow(m_stackedWidget);
+            } else if(e->type() == QEvent::FocusOut){
+                m_accountTips->hide();
+                m_accountTips->adjustSize();
+               // setshow(m_stackedWidget);
+            }
+            if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+                m_errorRegTips->hide();
+               // setshow(m_stackedWidget);
+            }
+        }
+        if(w == m_regPassLineEdit) {
+            if (e->type() == QEvent::FocusIn && m_regTips->isHidden()) {
+                m_regTips->show();
+                m_regTips->adjustSize();
 
-            setshow(m_stackedWidget);
-        } else if(e->type() == QEvent::FocusOut){
-            m_accountTips->hide();
-            m_accountTips->adjustSize();
-            setshow(m_stackedWidget);
-        }
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
-            m_errorRegTips->hide();
-            setshow(m_stackedWidget);
-        }
-    }
-    if(w == m_regPassLineEdit) {
-        if (e->type() == QEvent::FocusIn && m_regTips->isHidden()) {
-            m_regTips->show();
-            m_regTips->adjustSize();
+               // setshow(m_stackedWidget);
+            } else if(e->type() == QEvent::FocusOut){
+                m_regTips->hide();
 
-            setshow(m_stackedWidget);
-        } else if(e->type() == QEvent::FocusOut){
-            m_regTips->hide();
-
-            setshow(m_stackedWidget);
+               // setshow(m_stackedWidget);
+            }
+            if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+                m_errorRegTips->hide();
+               // setshow(m_stackedWidget);
+            }
         }
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
-            m_errorRegTips->hide();
-            setshow(m_stackedWidget);
+        if(w == m_regConfirmLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+                m_errorRegTips->hide();
+                //setshow(m_stackedWidget);
+            }
         }
-    }
-    if(w == m_regConfirmLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
-            m_errorRegTips->hide();
-            setshow(m_stackedWidget);
+        if(w == m_mcodeLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+                m_errorRegTips->hide();
+                //setshow(m_stackedWidget);
+            }
         }
-    }
-    if(w == m_mcodeLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
-            m_errorRegTips->hide();
-            setshow(m_stackedWidget);
-        }
-    }
-    if(w == m_phoneLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
-            m_errorRegTips->hide();
-            setshow(m_stackedWidget);
+        if(w == m_phoneLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+                m_errorRegTips->hide();
+               // setshow(m_stackedWidget);
+            }
         }
     }
 
     //登录页面的控件捕捉
-    if(w == m_loginPassLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
-            m_loginTips->hide();
+    if(m_stackedWidget->currentWidget() == m_loginDialog) {
+        if(w == m_loginPassLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
+                m_loginTips->hide();
 
-            setshow(m_stackedWidget);
+               // setshow(m_stackedWidget);
+            }
         }
-    }
-    if(w ==m_loginAccountLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
-            m_loginTips->hide();
+        if(w ==m_loginAccountLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
+                m_loginTips->hide();
 
-            setshow(m_stackedWidget);
+               // setshow(m_stackedWidget);
+            }
+            if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden()) {
+                m_loginCodeStatusTips->hide();
+
+              //  setshow(m_stackedWidget);
+
+            }
         }
-        if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden()) {
-            m_loginCodeStatusTips->hide();
+        if(w == m_loginMCodeLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
+                m_loginTips->hide();
 
-            setshow(m_stackedWidget);
-
+               // setshow(m_stackedWidget);
+            }
         }
-    }
-    if(w == m_loginMCodeLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
-            m_loginTips->hide();
+        if(w == m_loginLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden()) {
+                m_loginCodeStatusTips->hide();
 
-            setshow(m_stackedWidget);
-        }
-    }
-    if(w == m_loginLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden()) {
-            m_loginCodeStatusTips->hide();
+               // setshow(m_stackedWidget);
 
-            setshow(m_stackedWidget);
-
+            }
         }
     }
 
     //忘记密码页面的控件捕捉
-    if(w == m_passPasswordLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
-            m_errorPassTips->hide();
+    if(m_stackedWidget->currentWidget() == m_passDialog) {
+        if(w == m_passPasswordLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
+                m_errorPassTips->hide();
 
-            setshow(m_stackedWidget);
+               // setshow(m_stackedWidget);
 
+            }
+            if (e->type() == QEvent::FocusIn && m_passTips->isHidden()) {
+                m_passTips->show();
+
+               // setshow(m_stackedWidget);
+
+            } else if (e->type() == QEvent::FocusOut && !m_passTips->isHidden()) {
+                m_passTips->hide();
+
+               // setshow(m_stackedWidget);
+            }
         }
-        if (e->type() == QEvent::FocusIn && m_passTips->isHidden()) {
-            m_passTips->show();
+        if(w == m_passConfirmLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
+                m_errorPassTips->hide();
 
-            setshow(m_stackedWidget);
+               // setshow(m_stackedWidget);
 
-        } else if (e->type() == QEvent::FocusOut && !m_passTips->isHidden()) {
-            m_passTips->hide();
-
-            setshow(m_stackedWidget);
+            }
         }
+        if(w == m_passMCodeLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
+                m_errorPassTips->hide();
+
+               // setshow(m_stackedWidget);
+
+            }
+        }
+        if(w == m_passLineEdit) {
+            if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
+                m_errorPassTips->hide();
+
+              //  setshow(m_stackedWidget);
+
+            }
+        }
+
     }
-    if(w == m_passConfirmLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
-            m_errorPassTips->hide();
 
-            setshow(m_stackedWidget);
-
-        }
-    }
-    if(w == m_passMCodeLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
-            m_errorPassTips->hide();
-
-            setshow(m_stackedWidget);
-
-        }
-    }
-    if(w == m_passLineEdit) {
-        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
-            m_errorPassTips->hide();
-
-            setshow(m_stackedWidget);
-
-        }
-    }
-
-
-    if(w == m_stackedWidget) {
-        if(e->type() == QEvent::FocusOut) {
-            setshow(m_stackedWidget);
-        }
-    }
 
     if(w == m_submitBtn) {
-        if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden()) {
+        if (e->type() == QEvent::FocusIn && !m_loginTips->isHidden() && m_stackedWidget->currentWidget() == m_loginDialog) {
             m_loginTips->hide();
-            setshow(m_stackedWidget);
+           // setshow(m_stackedWidget);
 
         }
-        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden()) {
+        if (e->type() == QEvent::FocusIn && !m_errorRegTips->isHidden() && m_stackedWidget->currentWidget() == m_regDialog) {
             m_errorRegTips->hide();
-            setshow(m_stackedWidget);
+           // setshow(m_stackedWidget);
 
         }
-        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden()) {
+        if (e->type() == QEvent::FocusIn && !m_errorPassTips->isHidden() && m_stackedWidget->currentWidget() == m_passDialog) {
             m_errorPassTips->hide();
-            setshow(m_stackedWidget);
+           // setshow(m_stackedWidget);
 
         }
-        if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden()) {
+        if (e->type() == QEvent::FocusIn && !m_loginCodeStatusTips->isHidden() && m_stackedWidget->currentWidget() == m_loginDialog) {
             m_loginCodeStatusTips->hide();
-            setshow(m_stackedWidget);
+           // setshow(m_stackedWidget);
+
+        }
+        if (e->type() == QEvent::FocusIn && !m_BindDialog->get_tips()->isHidden() && m_stackedWidget->currentWidget() == m_BindDialog) {
+            m_BindDialog->get_tips()->hide();
+           // setshow(m_stackedWidget);
 
         }
     }
@@ -1492,11 +1596,10 @@ void MainDialog::set_clear() {
         emit m_regBtn->clicked();
     }
     m_loginDialog->set_window2();
-    m_delBtn->raise();
-    setshow(m_baseWidget);
+    //m_delBtn->raise();
 }
 
-void MainDialog::set_staus(bool ok) {
+void MainDialog::set_staus(const bool &ok) {
     if(m_baseWidget->currentWidget() == m_containerWidget) {
         if(m_stackedWidget->currentWidget() == m_loginDialog) {
             m_loginDialog->set_staus(ok);
@@ -1516,18 +1619,62 @@ void MainDialog::set_staus(bool ok) {
 void MainDialog::set_back() {
     m_baseWidget->setEnabled(true);
     set_staus(true);
+    m_blueEffect->stop();
+    m_submitBtn->setText(tr("Sign in"));
+    m_loginDialog->set_code(messagebox(108));
+    m_loginDialog->get_mcode_widget()->set_change(1);
+    m_loginTips->show();
+    setshow(m_stackedWidget);
+}
+
+void MainDialog::setnormal() {
+    m_baseWidget->setEnabled(true);
+    set_staus(true);
+    m_blueEffect->stop();
+    m_submitBtn->setText(tr("Sign in"));
+    if(m_loginDialog->get_stack_widget()->currentIndex() == 0) {
+        m_loginDialog->set_code(messagebox(108));
+        m_loginDialog->get_mcode_widget()->set_change(1);
+        m_loginTips->show();
+    } else {
+        m_loginDialog->set_code(messagebox(108));
+        m_loginCodeStatusTips->show();
+    }
+    setshow(m_stackedWidget);
+
 }
 
 /* 关闭按钮触发处理 */
 void MainDialog::on_close() {
-    //qDebug()<<"yes";
+    //qDebug()<<"yes  ssss";
+    m_forgetpassSendBtn->setEnabled(true);
+    m_forgetpassSendBtn->setText(tr("Send"));
     m_baseWidget->setEnabled(true);
     m_blueEffect->stop();
+    set_staus(true);
+
+    m_loginDialog->get_user_edit()->setText("");
+    m_PhoneLogin = "";
+    m_NameLogin = "";
+    m_loginDialog->get_mcode_widget()->set_change(1);
+    back_login_btn();
+    close();
+}
+
+void MainDialog::closedialog() {
+    m_forgetpassSendBtn->setEnabled(true);
+    m_forgetpassSendBtn->setText(tr("Send"));
+    m_baseWidget->setEnabled(true);
+    m_blueEffect->stop();
+    m_bAutoLogin = false;
+    set_staus(true);
     m_submitBtn->setText(tr("Sign in"));
     m_loginDialog->get_mcode_widget()->set_change(1);
+
     back_login_btn();
     set_clear();
     close();
+
 }
 
 MainDialog::~MainDialog() {

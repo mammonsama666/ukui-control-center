@@ -35,6 +35,7 @@ SOURCES += \
     editpassdialog.cpp \
     editpushbutton.cpp \
     frameitem.cpp \
+    infolabel.cpp \
     itemlist.cpp \
     logindialog.cpp \
     maindialog.cpp \
@@ -49,7 +50,8 @@ SOURCES += \
     svghandler.cpp \
     switchbutton.cpp \
     tips.cpp \
-    tooltips.cpp
+    tooltips.cpp \
+    visblebutton.cpp
 
 HEADERS += \
     areacodelineedit.h \
@@ -62,6 +64,7 @@ HEADERS += \
     editpassdialog.h \
     editpushbutton.h \
     frameitem.h \
+    infolabel.h \
     itemlist.h \
     logindialog.h \
     maindialog.h \
@@ -76,7 +79,8 @@ HEADERS += \
     svghandler.h \
     switchbutton.h \
     tips.h \
-    tooltips.h
+    tooltips.h \
+    visblebutton.h
 
 FORMS += \
 

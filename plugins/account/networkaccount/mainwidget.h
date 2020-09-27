@@ -42,6 +42,8 @@
 #include "svghandler.h"
 #include "blueeffect.h"
 
+#define PATH "/.cache/kylinssoclient/All.conf"
+
 class MainWidget : public QWidget
 {
     Q_OBJECT
@@ -54,8 +56,9 @@ public:
     void            setshow(QWidget *w);
     void            init_gui();
     void            handle_conf();
-    bool            judge_item(QString enable,int cur);
-    void            handle_write(int on,int id);
+    bool            judge_item(const QString &enable,const int &cur) const;
+    void            handle_write(const int &on,const int &id);
+    void            showDesktopNotify(const QString &message);
 protected:
     bool eventFilter(QObject *watched, QEvent *event);
 private:
@@ -82,7 +85,10 @@ private:
     QWidget             *m_nullwidgetContainer;
     QString             m_szCode = tr("Disconnected");
     QString             m_szConfPath;
-    QStringList         m_szItemlist = {"wallpaper","ukui-screensaver","ukui-menu","ukui-panel","ukui-panel2","indicator-china-weather","kylin-video"};
+    QStringList         m_szItemlist = {"wallpaper","ukui-screensaver","avatar","ukui-menu","ukui-panel","ukui-panel2",
+                                        "themes","mouse","touchpad","keyboard","shortcut","area","datetime","default-open",
+                                        "notice","option","peony","boot","power","editor","terminal",
+                                        "indicator-china-weather","kylin-video"};
     MainDialog*   m_mainDialog;
     QWidget             *m_infoWidget;
     QHBoxLayout         *m_infoLayout;
@@ -91,13 +97,21 @@ private:
     bool                m_bTokenValid = false;
     QTimer              *m_cLoginTimer;
     QTimer              *m_cSyncDelay;
+    QTimer              *m_singleDelay;
     QString             m_szUuid;
+    QTimer              *m_cRetry;
     QFileSystemWatcher m_fsWatcher;
     SVGHandler *m_svgHandler;
     Tooltips       *m_syncTooltips;
     QLabel          *m_syncTipsText;
     QHBoxLayout     *m_animateLayout;
     QHBoxLayout     *m_tipsLayout;
+    QMap<QString,QString> m_itemMap;
+    QString         m_key;
+    QStringList     m_keyInfoList;
+    bool            __once__ = false;
+    bool            __run__ = false;
+    bool            m_bIsStopped = false;
 
 public slots:
     void            neweditdialog();
@@ -118,6 +132,7 @@ public slots:
     void            setret_man(int ret);
     void            setname(QString n);
     void            setret_check(QString ret);
+    void            get_key_info(QString info);
 signals:
     void dooss(QString m_szUuid);
     void doman();
@@ -125,6 +140,8 @@ signals:
     void doconf();
     void dochange(QString name,int flag);
     void docheck();
+    void dosingle(QString key);
+    void closedialog();
 };
 
 #endif // CONFIG_LIST_WIDGET_H

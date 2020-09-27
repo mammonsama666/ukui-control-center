@@ -8,7 +8,7 @@ Blueeffect::Blueeffect(QWidget *parent) : QWidget(parent)
     m_svgHandler = new SVGHandler(this);
     m_workLayout = new QHBoxLayout;
 
-    this->setStyleSheet("ql_animation_label{background-color:#3D6BE5;border-radius:4px;}");
+    this->setStyleSheet("Blueeffect{background-color:#3D6BE5;border-radius:4px;}");
     m_textLabel->setStyleSheet("font-size:14px;color:#ffffff;background:transparent;");
     m_iconLabel->setStyleSheet("background:transparent;");
     m_iconLabel->setFixedSize(24,24);
@@ -20,14 +20,14 @@ Blueeffect::Blueeffect(QWidget *parent) : QWidget(parent)
     setLayout(m_workLayout);
     m_cTimer->stop();
     connect(m_cTimer,&QTimer::timeout, [this] () {
-        QPixmap pixmap = m_svgHandler->loadSvg(QString(":/new/image/loading1%1.svg").arg(m_cCnt));
+        QPixmap pixmap = m_svgHandler->loadSvgColor(QString(":/new/image/loading1%1.svg").arg(m_cCnt),"white",16);
         m_iconLabel->setPixmap(pixmap);
-        m_cCnt = (m_cCnt + 8) % 7;
+        m_cCnt = (m_cCnt + 9) % 8;
     });
     hide();
 }
 
-void Blueeffect::settext(QString t) {
+void Blueeffect::settext(const QString &t) {
     m_textLabel->setText(t);
 }
 
@@ -40,6 +40,7 @@ void Blueeffect::startmoive() {
 void Blueeffect::stop() {
     m_cCnt = 1;
     m_iconLabel->setPixmap(m_svgHandler->loadSvg(":/new/image/loading11.svg"));
-    m_cTimer->stop();
+    if(m_cTimer->isActive())
+        m_cTimer->stop();
     hide();
 }

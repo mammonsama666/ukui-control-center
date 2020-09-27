@@ -48,7 +48,7 @@ RegDialog::RegDialog(QWidget *parent) : QWidget(parent)
     m_phoneLineEdit->setFocusPolicy(Qt::StrongFocus);
 
 
-
+    m_accountLineEdit->setMaxLength(30);
     m_phoneLineEdit->setMaxLength(11);
     m_passLineEdit->setPlaceholderText(tr("Your password here"));
     m_passLineEdit->setEchoMode(QLineEdit::Password);
@@ -130,7 +130,7 @@ RegDialog::RegDialog(QWidget *parent) : QWidget(parent)
     m_phoneLineEdit->setFocus();
 }
 
-void RegDialog::set_staus(bool ok) {
+void RegDialog::set_staus(const bool &ok) {
     m_confirmLineEdit->setEnabled(ok);
     m_accountLineEdit->setEnabled(ok);
     m_phoneLineEdit->setEnabled(ok);
@@ -144,7 +144,7 @@ void RegDialog::setstyleline() {
 }
 
 /* 获取错误代码 */
-void RegDialog::set_code(QString codenum) {
+void RegDialog::set_code(const QString &codenum) {
     m_errorCode = codenum;
     emit code_changed();
 }
@@ -188,18 +188,18 @@ void RegDialog::change_uppercase() {
     m_mcodeLineEdit->setText(str.toUpper());
 }
 
-QString RegDialog::get_user_mcode() {
+QString RegDialog::get_user_mcode() const {
     return m_mcodeLineEdit->text();
 }
 
-QString RegDialog::get_user_phone() {
+QString RegDialog::get_user_phone() const {
     return m_phoneLineEdit->text();
 }
 
-QString RegDialog::get_user_account() {
+QString RegDialog::get_user_account() const {
     return m_accountLineEdit->text();
 }
-QString RegDialog::get_user_passwd() {
+QString RegDialog::get_user_passwd() const {
     return m_passLineEdit->text();
 }
 
@@ -209,10 +209,12 @@ void RegDialog::set_clear() {
         m_errorTips->hide();
     }
     m_passLineEdit->get_visble()->setChecked(false);
+    m_confirmLineEdit->get_visble()->setChecked(false);
     m_passLineEdit->setText("");
     m_accountLineEdit->setText("");
     m_phoneLineEdit->setText("");
     m_mcodeLineEdit->setText("");
+    m_confirmLineEdit->setText("");
 }
 
 Tips* RegDialog::get_tips() {
