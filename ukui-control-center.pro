@@ -13,8 +13,6 @@ TRANSLATIONS += \
     shell/res/i18n/zh_CN.ts \
     shell/res/i18n/tr.ts \
     shell/res/i18n/bo.ts \
-    shell/res/i18n/en_US.ts \
-
 
 # Automating generation .qm files from .ts files
 CONFIG(release, debug|release) {
