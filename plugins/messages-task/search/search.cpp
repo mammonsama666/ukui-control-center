@@ -45,17 +45,20 @@ QWidget *Search::get_plugin_ui()
         m_gsettings = new QGSettings(id, QByteArray(), this);
         //按钮状态初始化
         if (m_gsettings->keys().contains(SEARCH_METHOD_KEY)) {
+            //当前是否使用索引搜索/暴力搜索
             bool is_index_search_on = m_gsettings->get(SEARCH_METHOD_KEY).toBool();
             m_searchMethodBtn->setChecked(is_index_search_on);
         } else {
             m_searchMethodBtn->setEnabled(false);
         }
         if (m_gsettings->keys().contains(WEB_ENGINE_KEY)) {
+            //当前网页搜索的搜索引擎
             QString engine = m_gsettings->get(WEB_ENGINE_KEY).toString();
             m_webEngineFrame->mCombox->setCurrentIndex(m_webEngineFrame->mCombox->findData(engine));
         } else {
             m_webEngineFrame->mCombox->setEnabled(false);
         }
+        //监听gsettings值改变，更新控制面板UI
         connect(m_gsettings, &QGSettings::changed, this, [ = ](const QString &key) {
             if (key == SEARCH_METHOD_KEY) {
                 bool is_index_search_on = m_gsettings->get(SEARCH_METHOD_KEY).toBool();
@@ -64,7 +67,9 @@ QWidget *Search::get_plugin_ui()
                 m_searchMethodBtn->blockSignals(false);
             } else if (key == WEB_ENGINE_KEY) {
                 QString engine = m_gsettings->get(WEB_ENGINE_KEY).toString();
+                m_webEngineFrame->mCombox->blockSignals(true);
                 m_webEngineFrame->mCombox->setCurrentIndex(m_webEngineFrame->mCombox->findData(engine));
+                m_webEngineFrame->mCombox->blockSignals(false);
             }
         });
         connect(m_searchMethodBtn, &SwitchButton::checkedChanged, this, [ = ](bool checked) {
@@ -95,6 +100,9 @@ const QString Search::name() const
     return QStringLiteral("search");
 }
 
+/**
+ * @brief Search::initUi 初始化此插件UI
+ */
 void Search::initUi()
 {
     QFont font;
@@ -102,6 +110,7 @@ void Search::initUi()
     m_plugin_widget = new QWidget;
     m_mainLyt = new QVBoxLayout(m_plugin_widget);
     m_plugin_widget->setLayout(m_mainLyt);
+    //设置搜索模式部分的ui
     m_methodTitleLabel = new QLabel(m_plugin_widget);
     m_methodTitleLabel->setText(tr("Create Index"));
     m_methodTitleLabel->setFont(font);
@@ -123,7 +132,13 @@ void Search::initUi()
     m_mainLyt->addWidget(m_methodTitleLabel);
     m_mainLyt->addWidget(m_descLabel);
     m_mainLyt->addWidget(m_searchMethodFrame);
-
+    //设置黑名单文件夹部分的ui
+    QLabel * m_blockDirTitleLabel = nullptr;
+    QLabel * m_blockDirDescLabel = nullptr;
+    HoverWidget * m_addBlockDirWidget = nullptr;
+    QLabel * m_addBlockDirIcon = nullptr;
+    QLabel * m_addBlockDirLabel = nullptr;
+    //设置网页搜索引擎部分的ui
     m_webEngineLabel = new QLabel(m_plugin_widget);
     m_webEngineLabel->setFont(font);
     m_webEngineLabel->setText(tr("Web Engine"));
@@ -139,4 +154,25 @@ void Search::initUi()
     m_mainLyt->addWidget(m_webEngineFrame);
     m_mainLyt->addStretch();
     m_mainLyt->setContentsMargins(0, 0, 40, 0);
+}
+
+/**
+ * @brief Search::getBlockDirs 从配置文件获取黑名单并将黑名单列表传入
+ * @param blockDirs 存储黑名单文件夹的列表
+ */
+void Search::getBlockDirs(QStringList &blockDirs)
+{
+    blockDirs.clear();
+    //TODO
+}
+
+/**
+ * @brief Search::setBlockDir 尝试写入新的黑名单文件夹
+ * @param dirPath 待添加到黑名单的文件夹路径
+ * @return 0成功 !0添加失败的错误代码
+ */
+int Search::setBlockDir(const QString &dirPath)
+{
+    //TODO
+    return 0;
 }

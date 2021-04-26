@@ -9,12 +9,15 @@
 #include <QFrame>
 #include <SwitchButton/switchbutton.h>
 #include <QGSettings>
+#include "HoverWidget/hoverwidget.h"
 #include "shell/interface.h"
 #include "ComboxFrame/comboxframe.h"
 
 #define UKUI_SEARCH_SCHEMAS "org.ukui.search.settings"
 #define SEARCH_METHOD_KEY "indexSearch"
 #define WEB_ENGINE_KEY "webEngine"
+//TODO
+#define CONFIG_FILE "..."
 
 namespace Ui {
 class Search;
@@ -47,13 +50,23 @@ private:
 
     void initUi();
     QVBoxLayout * m_mainLyt = nullptr;
+    //设置搜索模式
     QLabel * m_methodTitleLabel = nullptr;
     QLabel * m_descLabel = nullptr;
     QFrame * m_searchMethodFrame = nullptr;
     QHBoxLayout * m_searchMethodLyt = nullptr;
     QLabel * m_searchMethodLabel = nullptr;
     SwitchButton * m_searchMethodBtn = nullptr;
-
+    //设置黑名单
+    QLabel * m_blockDirTitleLabel = nullptr;
+    QLabel * m_blockDirDescLabel = nullptr;
+    HoverWidget * m_addBlockDirWidget = nullptr;
+    QLabel * m_addBlockDirIcon = nullptr;
+    QLabel * m_addBlockDirLabel = nullptr;
+    QStringList m_blockDirs;
+    void getBlockDirs(QStringList &blockDirs);
+    int setBlockDir(const QString &dirPath);
+    //设置搜索引擎
     QLabel * m_webEngineLabel = nullptr;
     ComboxFrame * m_webEngineFrame = nullptr;
 };
